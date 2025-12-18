@@ -11,8 +11,19 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ActionEmailNode: typeof import('./src/components/ui/organisms/builder/nodes/ActionEmailNode.vue')['default']
+    ActionHttpNode: typeof import('./src/components/ui/organisms/builder/nodes/ActionHttpNode.vue')['default']
+    ActionSmsNode: typeof import('./src/components/ui/organisms/builder/nodes/ActionSmsNode.vue')['default']
+    BaseNode: typeof import('./src/components/ui/organisms/builder/nodes/BaseNode.vue')['default']
+    Canvas: typeof import('./src/components/ui/organisms/builder/Canvas.vue')['default']
+    ConfigPanel: typeof import('./src/components/ui/organisms/builder/ConfigPanel.vue')['default']
     HelloWorld: typeof import('./src/components/HelloWorld.vue')['default']
+    LogicDelayNode: typeof import('./src/components/ui/organisms/builder/nodes/LogicDelayNode.vue')['default']
+    LogicIfElseNode: typeof import('./src/components/ui/organisms/builder/nodes/LogicIfElseNode.vue')['default']
     Pallete: typeof import('./src/components/ui/organisms/builder/Pallete.vue')['default']
+    Topbar: typeof import('./src/components/ui/organisms/builder/Topbar.vue')['default']
+    TriggerManualNode: typeof import('./src/components/ui/organisms/builder/nodes/TriggerManualNode.vue')['default']
+    TriggerWebhookNode: typeof import('./src/components/ui/organisms/builder/nodes/TriggerWebhookNode.vue')['default']
     WorkFlowEdge: typeof import('./src/components/ui/organisms/builder/WorkFlowEdge.vue')['default']
     WorkFlowNode: typeof import('./src/components/ui/organisms/builder/WorkFlowNode.vue')['default']
   }
