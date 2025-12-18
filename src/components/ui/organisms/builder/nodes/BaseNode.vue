@@ -1,45 +1,48 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Handle, Position } from '@vue-flow/core'
-import type { NodeProps } from '@vue-flow/core'
-import type { WorkflowNodeData } from '@/types/workflow'
-import { useWorkflowStore } from '@/stores/workflow'
+import { computed } from "vue";
+import { Handle, Position } from "@vue-flow/core";
+import type { NodeProps } from "@vue-flow/core";
+import {
+  type WorkflowNodeData,
+  WorkflowExecutionStatus,
+} from "@/types/workflow";
+import { useWorkflowStore } from "@/stores/workflow";
 
 interface Props extends NodeProps {
-  data: WorkflowNodeData
-  icon?: string
-  color?: string
-  hasSourceHandle?: boolean
-  hasTargetHandle?: boolean
-  sourceHandles?: { id: string; label: string; position?: Position }[]
+  data: WorkflowNodeData;
+  icon?: string;
+  color?: string;
+  hasSourceHandle?: boolean;
+  hasTargetHandle?: boolean;
+  sourceHandles?: { id: string; label: string; position?: Position }[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
   hasSourceHandle: true,
   hasTargetHandle: true,
   sourceHandles: () => [],
-})
+});
 
-const workflowStore = useWorkflowStore()
+const workflowStore = useWorkflowStore();
 
-const isActive = computed(() => workflowStore.activeNodeId === props.id)
-const isSelected = computed(() => workflowStore.selectedNodeIds.has(props.id))
+const isActive = computed(() => workflowStore.activeNodeId === props.id);
+const isSelected = computed(() => workflowStore.selectedNodeIds.has(props.id));
 
 const statusClass = computed(() => {
   switch (props.data.executionStatus) {
-    case 'running':
-      return 'ring-2 ring-blue-400 animate-pulse'
-    case 'success':
-      return 'ring-2 ring-green-400'
-    case 'error':
-      return 'ring-2 ring-red-400'
+    case WorkflowExecutionStatus.RUNNING:
+      return "ring-2 ring-blue-400 animate-pulse";
+    case WorkflowExecutionStatus.SUCCESS:
+      return "ring-2 ring-green-400";
+    case WorkflowExecutionStatus.ERROR:
+      return "ring-2 ring-red-400";
     default:
-      return ''
+      return "";
   }
-})
+});
 
 function handleClick() {
-  workflowStore.setActiveNode(props.id)
+  workflowStore.setActiveNode(props.id);
 }
 </script>
 
@@ -48,7 +51,7 @@ function handleClick() {
     class="workflow-node min-w-[180px] rounded-lg bg-white shadow-lg border-2 transition-all duration-200 cursor-pointer"
     :class="[
       statusClass,
-      isActive ? 'border-indigo-500 shadow-indigo-200' : 'border-gray-200',
+      isActive ? 'border-indigo-500' : 'border-gray-200',
       isSelected ? 'ring-2 ring-indigo-300' : '',
     ]"
     @click="handleClick"
@@ -57,8 +60,8 @@ function handleClick() {
     <Handle
       v-if="hasTargetHandle"
       type="target"
-      :position="Position.Top"
-      class="!w-3 !h-3 !bg-gray-400 !border-2 !border-white"
+      :position="Position.Left"
+      class="w-3! h-3! bg-gray-400! border-2! border-white!"
     />
 
     <!-- Header -->
@@ -70,18 +73,18 @@ function handleClick() {
       <span class="font-semibold text-sm text-gray-700 truncate">
         {{ data.label }}
       </span>
-      
+
       <!-- Status indicator -->
       <span
-        v-if="data.executionStatus === 'running'"
+        v-if="data.executionStatus === WorkflowExecutionStatus.RUNNING"
         class="ml-auto w-2 h-2 rounded-full bg-blue-500 animate-pulse"
       />
       <span
-        v-else-if="data.executionStatus === 'success'"
+        v-else-if="data.executionStatus === WorkflowExecutionStatus.SUCCESS"
         class="ml-auto w-2 h-2 rounded-full bg-green-500"
       />
       <span
-        v-else-if="data.executionStatus === 'error'"
+        v-else-if="data.executionStatus === WorkflowExecutionStatus.ERROR"
         class="ml-auto w-2 h-2 rounded-full bg-red-500"
       />
     </div>
@@ -97,8 +100,8 @@ function handleClick() {
     <Handle
       v-if="hasSourceHandle && sourceHandles.length === 0"
       type="source"
-      :position="Position.Bottom"
-      class="!w-3 !h-3 !bg-indigo-500 !border-2 !border-white"
+      :position="Position.Right"
+      class="w-3! h-3! bg-indigo-500! border-2! border-white!"
     />
 
     <!-- Multiple source handles (for if/else) -->
@@ -109,8 +112,8 @@ function handleClick() {
         type="source"
         :id="handle.id"
         :position="handle.position || Position.Bottom"
-        class="!w-3 !h-3 !border-2 !border-white"
-        :class="handle.id === 'true' ? '!bg-green-500' : '!bg-red-500'"
+        class="w-3! h-3! border-2! border-white!"
+        :class="handle.id === 'true' ? 'bg-green-500!' : 'bg-red-500!'"
         :style="{
           left: handle.id === 'true' ? '25%' : '75%',
         }"
@@ -119,10 +122,4 @@ function handleClick() {
   </div>
 </template>
 
-<style scoped>
-.workflow-node:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 25px -5px rgb(0 0 0 / 0.1);
-}
-</style>
-
+<style scoped></style>

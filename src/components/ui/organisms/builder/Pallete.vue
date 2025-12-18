@@ -5,6 +5,7 @@ import {
   NODE_DEFINITIONS,
   type NodeType,
   type NodeCategory,
+  WorkflowNodeType,
 } from "@/types/workflow";
 import { useWorkflowStore } from "@/stores/workflow";
 
@@ -31,7 +32,24 @@ const categoryLabels: Record<NodeCategory, string> = {
   logic: "🧠 Logic",
 };
 
+// Check if a node type is disabled due to constraints
+function isNodeDisabled(type: NodeType): boolean {
+  return !workflowStore.canAddNode(type).allowed;
+}
+
+// Get the reason why a node is disabled
+function getDisabledReason(type: NodeType): string | undefined {
+  const validation = workflowStore.canAddNode(type);
+  return validation.reason;
+}
+
 function onDragStart(event: DragEvent, type: NodeType) {
+  // Prevent dragging disabled nodes
+  if (isNodeDisabled(type)) {
+    event.preventDefault();
+    return;
+  }
+
   if (event.dataTransfer) {
     event.dataTransfer.setData("application/vueflow", type);
     event.dataTransfer.effectAllowed = "move";
@@ -78,17 +96,26 @@ function onDragEnd() {
             <div
               v-for="node in nodes"
               :key="node.type"
-              draggable="true"
-              class="group flex items-center gap-3 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-grab active:cursor-grabbing transition-all duration-150 border border-transparent hover:border-gray-200 hover:shadow-sm"
+              :draggable="!isNodeDisabled(node.type)"
+              class="group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 border border-transparent"
+              :class="[
+                isNodeDisabled(node.type)
+                  ? 'bg-gray-100 opacity-50 cursor-not-allowed'
+                  : 'bg-gray-50 hover:bg-gray-100 cursor-grab active:cursor-grabbing hover:border-gray-200 hover:shadow-sm',
+              ]"
               :style="{
                 borderLeftColor: node.color,
                 borderLeftWidth: '3px',
               }"
+              :title="getDisabledReason(node.type) || node.description"
               @dragstart="onDragStart($event, node.type)"
               @dragend="onDragEnd"
             >
               <!-- Icon -->
-              <span class="text-xl group-hover:scale-110 transition-transform">
+              <span
+                class="text-xl transition-transform"
+                :class="{ 'group-hover:scale-110': !isNodeDisabled(node.type) }"
+              >
                 {{ node.icon }}
               </span>
 
@@ -102,9 +129,30 @@ function onDragEnd() {
                 </div>
               </div>
 
-              <!-- Shortcut hint -->
+              <!-- Constraint indicator -->
               <div
-                v-if="node.shortcut"
+                v-if="isNodeDisabled(node.type)"
+                class="flex items-center"
+                :title="getDisabledReason(node.type)"
+              >
+                <svg
+                  class="w-4 h-4 text-amber-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+
+              <!-- Shortcut hint (only show if not disabled) -->
+              <div
+                v-else-if="node.shortcut"
                 class="hidden group-hover:flex items-center gap-0.5 opacity-60"
               >
                 <kbd

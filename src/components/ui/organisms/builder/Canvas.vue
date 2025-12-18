@@ -99,10 +99,14 @@ function onPaneClick() {
     :multi-selection-key-code="['Meta', 'Control']"
     :selection-key-code="['Shift']"
     fit-view-on-init
-    class="workflow-canvas"
+    class="bg-gray-100"
     @dragover="onDragOver"
     @drop="onDrop"
     @pane-click="onPaneClick"
+    :style="{
+      width: '100vw',
+      height: '100vh',
+    }"
   >
     <!-- Background pattern -->
     <Background
@@ -159,12 +163,6 @@ function onPaneClick() {
 @import "@vue-flow/core/dist/theme-default.css";
 @import "@vue-flow/minimap/dist/style.css";
 
-.workflow-canvas {
-  width: 100vw;
-  height: 100vh;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-}
-
 /* Custom edge styling */
 .vue-flow__edge-path {
   stroke: #6366f1;
@@ -204,7 +202,4 @@ function onPaneClick() {
 }
 
 /* Handle hover effects */
-.vue-flow__handle:hover {
-  transform: scale(1.2);
-}
 </style>

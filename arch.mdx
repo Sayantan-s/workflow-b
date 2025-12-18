@@ -73,6 +73,8 @@
 
 - The automation workflow should have a **RUN PREVIEW** functionality to run the flow for different cases.
 
+- State Rollback / Forward functionality
+
 ### Non-Functional Requirements
 
 **_UX_**
@@ -81,3 +83,8 @@
 - Multiple Nodes can be selected by mouse based selection
 - All Nodes can be selected by `cmd + a`
 - The Current Workflow State should be persisted in Local Storage / IndexDB
+
+**Constraints**
+
+- Only one manual trigger node is allowed
+- manual trigger and webhook node cannot be connected just after each other

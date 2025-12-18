@@ -2,12 +2,59 @@
 import { computed, watch, ref } from "vue";
 import { Panel } from "@vue-flow/core";
 import { useWorkflowStore } from "@/stores/workflow";
-import { NODE_DEFINITIONS } from "@/types/workflow";
+import {
+  NODE_DEFINITIONS,
+  WorkflowNodeType,
+  type WebhookTriggerData,
+  type HttpActionData,
+  type EmailActionData,
+  type SmsActionData,
+  type IfElseLogicData,
+  type DelayLogicData,
+  type ManualTriggerData,
+} from "@/types/workflow";
 
 const workflowStore = useWorkflowStore();
 
 const activeNode = computed(() => workflowStore.activeNode);
 const isOpen = computed(() => activeNode.value !== null);
+
+// Type-safe data getters
+const webhookData = computed(() =>
+  activeNode.value?.data.type === WorkflowNodeType.TRIGGER_WEBHOOK
+    ? (activeNode.value.data as WebhookTriggerData)
+    : null
+);
+const httpData = computed(() =>
+  activeNode.value?.data.type === WorkflowNodeType.ACTION_HTTP
+    ? (activeNode.value.data as HttpActionData)
+    : null
+);
+const emailData = computed(() =>
+  activeNode.value?.data.type === WorkflowNodeType.ACTION_EMAIL
+    ? (activeNode.value.data as EmailActionData)
+    : null
+);
+const smsData = computed(() =>
+  activeNode.value?.data.type === WorkflowNodeType.ACTION_SMS
+    ? (activeNode.value.data as SmsActionData)
+    : null
+);
+const ifElseData = computed(() =>
+  activeNode.value?.data.type === WorkflowNodeType.LOGIC_IF_ELSE
+    ? (activeNode.value.data as IfElseLogicData)
+    : null
+);
+const delayData = computed(() =>
+  activeNode.value?.data.type === WorkflowNodeType.LOGIC_DELAY
+    ? (activeNode.value.data as DelayLogicData)
+    : null
+);
+const manualTriggerData = computed(() =>
+  activeNode.value?.data.type === WorkflowNodeType.TRIGGER_MANUAL
+    ? (activeNode.value.data as ManualTriggerData)
+    : null
+);
 
 // Get node definition for icon and color
 const nodeDefinition = computed(() => {
@@ -115,7 +162,7 @@ function deleteNode() {
           <div class="space-y-1.5">
             <label class="text-xs font-medium text-gray-600">Label</label>
             <input
-              :value="formData.label"
+              :value="activeNode.data.label"
               type="text"
               class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow"
               placeholder="Node label"
@@ -127,7 +174,7 @@ function deleteNode() {
           <div class="space-y-1.5">
             <label class="text-xs font-medium text-gray-600">Description</label>
             <textarea
-              :value="formData.description as string"
+              :value="activeNode.data.description || ''"
               rows="2"
               class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow resize-none"
               placeholder="Optional description"
@@ -138,13 +185,13 @@ function deleteNode() {
           <hr class="border-gray-100" />
 
           <!-- Type-specific fields -->
-          <template v-if="activeNode.data.type === 'trigger:webhook'">
+          <template v-if="webhookData">
             <div class="space-y-1.5">
               <label class="text-xs font-medium text-gray-600"
                 >Webhook URL</label
               >
               <input
-                :value="formData.webhookUrl"
+                :value="webhookData.webhookUrl"
                 type="url"
                 class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 placeholder="https://example.com/webhook"
@@ -154,7 +201,7 @@ function deleteNode() {
             <div class="space-y-1.5">
               <label class="text-xs font-medium text-gray-600">Method</label>
               <select
-                :value="formData.method"
+                :value="webhookData.method"
                 class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 @change="updateField('method', getSelectValue($event))"
               >
@@ -167,11 +214,11 @@ function deleteNode() {
             </div>
           </template>
 
-          <template v-else-if="activeNode.data.type === 'action:http'">
+          <template v-else-if="httpData">
             <div class="space-y-1.5">
               <label class="text-xs font-medium text-gray-600">URL</label>
               <input
-                :value="formData.url"
+                :value="httpData.url"
                 type="url"
                 class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 placeholder="https://api.example.com/endpoint"
@@ -185,7 +232,7 @@ function deleteNode() {
               <div class="space-y-1.5">
                 <label class="text-xs font-medium text-gray-600">Method</label>
                 <select
-                  :value="formData.method"
+                  :value="httpData.method"
                   class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   @change="updateField('method', getSelectValue($event))"
                 >
@@ -201,7 +248,7 @@ function deleteNode() {
                   >Timeout (s)</label
                 >
                 <input
-                  :value="formData.timeout"
+                  :value="httpData.timeout"
                   type="number"
                   min="1"
                   max="300"
@@ -221,7 +268,7 @@ function deleteNode() {
                 <button
                   class="flex-1 px-3 py-1.5 text-xs rounded-md transition-colors"
                   :class="
-                    formData.bodyType === 'json'
+                    httpData.bodyType === 'json'
                       ? 'bg-indigo-100 text-indigo-700'
                       : 'bg-gray-100 text-gray-600'
                   "
@@ -232,7 +279,7 @@ function deleteNode() {
                 <button
                   class="flex-1 px-3 py-1.5 text-xs rounded-md transition-colors"
                   :class="
-                    formData.bodyType === 'raw'
+                    httpData.bodyType === 'raw'
                       ? 'bg-indigo-100 text-indigo-700'
                       : 'bg-gray-100 text-gray-600'
                   "
@@ -244,17 +291,17 @@ function deleteNode() {
             </div>
           </template>
 
-          <template v-else-if="activeNode.data.type === 'action:email'">
+          <template v-else-if="emailData">
             <div class="space-y-1.5">
               <label class="text-xs font-medium text-gray-600">To</label>
               <input
-                :value="(formData.recipients as { to?: string[] })?.to?.join(', ')"
+                :value="emailData.recipients?.to?.join(', ')"
                 type="text"
                 class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 placeholder="email@example.com, ..."
                 @input="
                   updateField('recipients', {
-                    ...(formData.recipients as object),
+                    ...emailData.recipients,
                     to: getInputValue($event)
                       .split(',')
                       .map((s) => s.trim())
@@ -266,7 +313,7 @@ function deleteNode() {
             <div class="space-y-1.5">
               <label class="text-xs font-medium text-gray-600">Subject</label>
               <input
-                :value="formData.subject"
+                :value="emailData.subject"
                 type="text"
                 class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 placeholder="Email subject"
@@ -276,7 +323,7 @@ function deleteNode() {
             <div class="space-y-1.5">
               <label class="text-xs font-medium text-gray-600">Body</label>
               <textarea
-                :value="formData.body as string"
+                :value="emailData.body"
                 rows="4"
                 class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                 placeholder="Email body content"
@@ -285,11 +332,11 @@ function deleteNode() {
             </div>
           </template>
 
-          <template v-else-if="activeNode.data.type === 'action:sms'">
+          <template v-else-if="smsData">
             <div class="space-y-1.5">
               <label class="text-xs font-medium text-gray-600">To Number</label>
               <input
-                :value="formData.toNumber"
+                :value="smsData.toNumber"
                 type="tel"
                 class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 placeholder="+1234567890"
@@ -300,11 +347,11 @@ function deleteNode() {
               <label class="text-xs font-medium text-gray-600">
                 Message
                 <span class="text-gray-400 font-normal"
-                  >({{ (formData.message as string)?.length || 0 }}/160)</span
+                  >({{ smsData.message?.length || 0 }}/160)</span
                 >
               </label>
               <textarea
-                :value="formData.message as string"
+                :value="smsData.message"
                 rows="3"
                 maxlength="160"
                 class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
@@ -314,14 +361,14 @@ function deleteNode() {
             </div>
           </template>
 
-          <template v-else-if="activeNode.data.type === 'logic:delay'">
+          <template v-else-if="delayData">
             <div class="space-y-1.5">
               <label class="text-xs font-medium text-gray-600"
                 >Delay Duration</label
               >
               <div class="flex gap-2">
                 <input
-                  :value="formData.delayValue"
+                  :value="delayData.delayValue"
                   type="number"
                   min="1"
                   class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -333,7 +380,7 @@ function deleteNode() {
                   "
                 />
                 <select
-                  :value="formData.delayType"
+                  :value="delayData.delayType"
                   class="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   @change="updateField('delayType', getSelectValue($event))"
                 >
@@ -344,7 +391,7 @@ function deleteNode() {
             </div>
           </template>
 
-          <template v-else-if="activeNode.data.type === 'trigger:manual'">
+          <template v-else-if="manualTriggerData">
             <div class="p-4 bg-green-50 rounded-lg border border-green-200">
               <p class="text-xs text-green-700">
                 This trigger starts the workflow manually when you click the Run
@@ -353,7 +400,7 @@ function deleteNode() {
             </div>
           </template>
 
-          <template v-else-if="activeNode.data.type === 'logic:if-else'">
+          <template v-else-if="ifElseData">
             <div class="space-y-1.5">
               <label class="text-xs font-medium text-gray-600">Condition</label>
               <p class="text-[10px] text-gray-400 mb-2">
@@ -361,26 +408,26 @@ function deleteNode() {
               </p>
               <div class="space-y-2">
                 <input
-                  :value="(formData.conditions as { field?: string }[])?.[0]?.field"
+                  :value="ifElseData.conditions?.[0]?.field"
                   type="text"
                   class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   placeholder="Field name (e.g., response.status)"
                   @input="
                     updateField('conditions', [
                       {
-                        ...(formData.conditions as object[])?.[0],
+                        ...ifElseData.conditions?.[0],
                         field: getInputValue($event),
                       },
                     ])
                   "
                 />
                 <select
-                  :value="(formData.conditions as { operator?: string }[])?.[0]?.operator"
+                  :value="ifElseData.conditions?.[0]?.operator"
                   class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   @change="
                     updateField('conditions', [
                       {
-                        ...(formData.conditions as object[])?.[0],
+                        ...ifElseData.conditions?.[0],
                         operator: getSelectValue($event),
                       },
                     ])
@@ -394,14 +441,14 @@ function deleteNode() {
                   <option value="isEmpty">Is Empty</option>
                 </select>
                 <input
-                  :value="(formData.conditions as { value?: string }[])?.[0]?.value"
+                  :value="ifElseData.conditions?.[0]?.value"
                   type="text"
                   class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   placeholder="Value to compare"
                   @input="
                     updateField('conditions', [
                       {
-                        ...(formData.conditions as object[])?.[0],
+                        ...ifElseData.conditions?.[0],
                         value: getInputValue($event),
                       },
                     ])

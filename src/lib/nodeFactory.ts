@@ -1,4 +1,9 @@
-import type { NodeType, WorkflowNodeData } from "@/types/workflow";
+import {
+  type NodeType,
+  type WorkflowNodeData,
+  WorkflowNodeType,
+  WorkflowExecutionStatus,
+} from "@/types/workflow";
 
 /**
  * Creates default node data based on the node type
@@ -6,33 +11,33 @@ import type { NodeType, WorkflowNodeData } from "@/types/workflow";
 export function createDefaultNodeData(type: NodeType): WorkflowNodeData {
   const base = {
     isValid: false,
-    executionStatus: "idle" as const,
+    executionStatus: WorkflowExecutionStatus.IDLE,
   };
 
   switch (type) {
-    case "trigger:manual":
+    case WorkflowNodeType.TRIGGER_MANUAL:
       return {
         ...base,
-        type: "trigger:manual",
+        type: WorkflowNodeType.TRIGGER_MANUAL,
         label: "Manual Trigger",
         description: "Click to run workflow",
         isValid: true, // Manual trigger is always valid
       };
 
-    case "trigger:webhook":
+    case WorkflowNodeType.TRIGGER_WEBHOOK:
       return {
         ...base,
-        type: "trigger:webhook",
+        type: WorkflowNodeType.TRIGGER_WEBHOOK,
         label: "Webhook",
         webhookUrl: "",
         method: "POST",
         auth: { type: "none" },
       };
 
-    case "action:http":
+    case WorkflowNodeType.ACTION_HTTP:
       return {
         ...base,
-        type: "action:http",
+        type: WorkflowNodeType.ACTION_HTTP,
         label: "HTTP Request",
         url: "",
         method: "GET",
@@ -42,10 +47,10 @@ export function createDefaultNodeData(type: NodeType): WorkflowNodeData {
         timeout: 30,
       };
 
-    case "action:email":
+    case WorkflowNodeType.ACTION_EMAIL:
       return {
         ...base,
-        type: "action:email",
+        type: WorkflowNodeType.ACTION_EMAIL,
         label: "Send Email",
         recipients: { to: [], cc: [], bcc: [] },
         subject: "",
@@ -54,27 +59,27 @@ export function createDefaultNodeData(type: NodeType): WorkflowNodeData {
         attachments: [],
       };
 
-    case "action:sms":
+    case WorkflowNodeType.ACTION_SMS:
       return {
         ...base,
-        type: "action:sms",
+        type: WorkflowNodeType.ACTION_SMS,
         label: "Send SMS",
         toNumber: "",
         message: "",
       };
 
-    case "logic:if-else":
+    case WorkflowNodeType.LOGIC_IF_ELSE:
       return {
         ...base,
-        type: "logic:if-else",
+        type: WorkflowNodeType.LOGIC_IF_ELSE,
         label: "If/Else",
         conditions: [{ field: "", operator: "equals", value: "" }],
       };
 
-    case "logic:delay":
+    case WorkflowNodeType.LOGIC_DELAY:
       return {
         ...base,
-        type: "logic:delay",
+        type: WorkflowNodeType.LOGIC_DELAY,
         label: "Delay",
         delayType: "hours",
         delayValue: 1,
@@ -90,14 +95,14 @@ export function createDefaultNodeData(type: NodeType): WorkflowNodeData {
  * Maps our internal node types to Vue Flow custom node type names
  */
 export function getVueFlowNodeType(type: NodeType): string {
-  const mapping: Record<NodeType, string> = {
-    "trigger:manual": "triggerManual",
-    "trigger:webhook": "triggerWebhook",
-    "action:http": "actionHttp",
-    "action:email": "actionEmail",
-    "action:sms": "actionSms",
-    "logic:if-else": "logicIfElse",
-    "logic:delay": "logicDelay",
+  const mapping: Record<WorkflowNodeType, string> = {
+    [WorkflowNodeType.TRIGGER_MANUAL]: "triggerManual",
+    [WorkflowNodeType.TRIGGER_WEBHOOK]: "triggerWebhook",
+    [WorkflowNodeType.ACTION_HTTP]: "actionHttp",
+    [WorkflowNodeType.ACTION_EMAIL]: "actionEmail",
+    [WorkflowNodeType.ACTION_SMS]: "actionSms",
+    [WorkflowNodeType.LOGIC_IF_ELSE]: "logicIfElse",
+    [WorkflowNodeType.LOGIC_DELAY]: "logicDelay",
   };
   return mapping[type];
 }

@@ -2,7 +2,6 @@
 import { computed } from "vue";
 import type { NodeProps } from "@vue-flow/core";
 import type { EmailActionData } from "@/types/workflow";
-import BaseNode from "./BaseNode.vue";
 
 interface Props extends NodeProps {
   data: EmailActionData;
