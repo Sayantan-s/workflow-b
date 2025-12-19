@@ -27,6 +27,9 @@ const workflowStore = useWorkflowStore();
 
 const isActive = computed(() => workflowStore.activeNodeId === props.id);
 const isSelected = computed(() => workflowStore.selectedNodeIds.has(props.id));
+const hasValidationError = computed(() =>
+  workflowStore.errorNodeIds.has(props.id)
+);
 
 const statusClass = computed(() => {
   switch (props.data.executionStatus) {
@@ -51,8 +54,12 @@ function handleClick() {
     class="workflow-node min-w-[180px] rounded-lg bg-white shadow-lg border-2 transition-all duration-200 cursor-pointer"
     :class="[
       statusClass,
-      isActive ? 'border-indigo-500' : 'border-gray-200',
-      isSelected ? 'ring-2 ring-indigo-300' : '',
+      hasValidationError
+        ? 'border-red-500 ring-2 ring-red-200 animate-pulse'
+        : isActive
+        ? 'border-indigo-500'
+        : 'border-gray-200',
+      isSelected && !hasValidationError ? 'ring-2 ring-indigo-300' : '',
     ]"
     @click="handleClick"
   >
@@ -104,22 +111,48 @@ function handleClick() {
       class="w-3! h-3! bg-indigo-500! border-2! border-white!"
     />
 
-    <!-- Multiple source handles (for if/else) -->
+    <!-- Multiple source handles (for conditional nodes: if/else, http) -->
     <template v-if="sourceHandles.length > 0">
       <Handle
-        v-for="handle in sourceHandles"
+        v-for="(handle, index) in sourceHandles"
         :key="handle.id"
         type="source"
         :id="handle.id"
         :position="handle.position || Position.Bottom"
         class="w-3! h-3! border-2! border-white!"
-        :class="handle.id === 'true' ? 'bg-green-500!' : 'bg-red-500!'"
+        :class="getHandleClass(handle.id)"
         :style="{
-          left: handle.id === 'true' ? '25%' : '75%',
+          left: getHandlePosition(index, sourceHandles.length),
         }"
       />
     </template>
   </div>
 </template>
+
+<script lang="ts">
+// Helper functions for handle positioning and styling
+function getHandleClass(handleId: string): string {
+  switch (handleId) {
+    case "true":
+    case "success":
+      return "bg-green-500!";
+    case "false":
+    case "error":
+      return "bg-red-500!";
+    case "match":
+      return "bg-blue-500!";
+    case "no_match":
+      return "bg-amber-500!";
+    default:
+      return "bg-indigo-500!";
+  }
+}
+
+function getHandlePosition(index: number, total: number): string {
+  // Distribute handles evenly across the bottom
+  const step = 100 / (total + 1);
+  return `${step * (index + 1)}%`;
+}
+</script>
 
 <style scoped></style>

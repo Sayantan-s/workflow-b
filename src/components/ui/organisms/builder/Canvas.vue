@@ -6,7 +6,7 @@ import { MiniMap } from "@vue-flow/minimap";
 import { useWorkflowStore } from "@/stores/workflow";
 import type { NodeType } from "@/types/workflow";
 
-// Import custom node components
+// Import custom node and edge components
 import {
   TriggerManualNode,
   TriggerWebhookNode,
@@ -16,19 +16,35 @@ import {
   LogicIfElseNode,
   LogicDelayNode,
 } from "./nodes";
+import WorkFlowEdge from "./WorkFlowEdge.vue";
 
 const workflowStore = useWorkflowStore();
 
 const { onConnect, onNodesChange, onEdgesChange, project, vueFlowRef } =
   useVueFlow();
 
-// Handle connection between nodes
+// Handle connection between nodes with validation
 onConnect((connection: Connection) => {
   if (connection.source && connection.target) {
+    // Validate connection before adding
+    const validation = workflowStore.canConnect(
+      connection.source,
+      connection.target,
+      connection.sourceHandle ?? undefined,
+      connection.targetHandle ?? undefined
+    );
+
+    if (!validation.allowed) {
+      // Show validation error (could be replaced with toast notification)
+      console.warn("Connection blocked:", validation.reason);
+      return;
+    }
+
     workflowStore.addEdge(
       connection.source,
       connection.target,
-      connection.sourceHandle ?? undefined
+      connection.sourceHandle ?? undefined,
+      connection.targetHandle ?? undefined
     );
   }
 });
@@ -152,8 +168,49 @@ function onPaneClick() {
       <LogicDelayNode v-bind="nodeProps" />
     </template>
 
+    <!-- Custom edge template with labels -->
+    <template #edge-default="edgeProps">
+      <WorkFlowEdge v-bind="edgeProps" />
+    </template>
+
     <!-- Slot for additional UI components (Palette, Topbar, ConfigPanel) -->
     <slot />
+
+    <!-- Validation Panel -->
+    <div
+      v-if="workflowStore.graphErrors.length > 0 || workflowStore.graphWarnings.length > 0"
+      class="absolute bottom-4 left-4 max-w-md z-50"
+    >
+      <!-- Errors -->
+      <div
+        v-for="error in workflowStore.graphErrors"
+        :key="`error-${error.message}`"
+        class="mb-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg shadow-lg"
+      >
+        <div class="flex items-start gap-2">
+          <span class="text-red-500 text-lg">⚠️</span>
+          <div>
+            <p class="text-sm font-semibold text-red-700">Validation Error</p>
+            <p class="text-xs text-red-600 mt-0.5">{{ error.message }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Warnings -->
+      <div
+        v-for="warning in workflowStore.graphWarnings"
+        :key="`warning-${warning.message}`"
+        class="mb-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg shadow-lg"
+      >
+        <div class="flex items-start gap-2">
+          <span class="text-amber-500 text-lg">💡</span>
+          <div>
+            <p class="text-sm font-semibold text-amber-700">Warning</p>
+            <p class="text-xs text-amber-600 mt-0.5">{{ warning.message }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
   </VueFlow>
 </template>
 

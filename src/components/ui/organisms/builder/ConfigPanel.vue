@@ -174,7 +174,7 @@ function deleteNode() {
           <div class="space-y-1.5">
             <label class="text-xs font-medium text-gray-600">Description</label>
             <textarea
-              :value="activeNode.data.description || ''"
+              :value="activeNode?.data?.description || ''"
               rows="2"
               class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow resize-none"
               placeholder="Optional description"

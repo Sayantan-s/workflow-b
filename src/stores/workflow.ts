@@ -14,6 +14,13 @@ import {
   generateNodeId,
   generateEdgeId,
 } from "@/lib/nodeFactory";
+import {
+  validateWorkflowGraph,
+  validateNewConnection,
+  type ValidationResult,
+} from "@/lib/graphValidation";
+import { getEdgeStyle } from "@/lib/graphValidation";
+import { validateNodeData, getNodeSchema } from "@/lib/schemas";
 
 const STORAGE_KEY = "workflow-state";
 
@@ -29,6 +36,13 @@ export const useWorkflowStore = defineStore("workflow", () => {
   // UI state
   const isDragging = ref(false);
   const draggedNodeType = ref<NodeType | null>(null);
+
+  // Validation state
+  const validationResult = ref<ValidationResult>({
+    isValid: true,
+    errors: [],
+    warnings: [],
+  });
 
   // ============ GETTERS ============
   const activeNode = computed(
@@ -62,6 +76,32 @@ export const useWorkflowStore = defineStore("workflow", () => {
   const hasWebhookTrigger = computed(() =>
     nodes.value.some((n) => n.data.type === WorkflowNodeType.TRIGGER_WEBHOOK)
   );
+
+  // Validation getters
+  const graphErrors = computed(() => validationResult.value.errors);
+  const graphWarnings = computed(() => validationResult.value.warnings);
+  const isGraphValid = computed(() => validationResult.value.isValid);
+  const hasCycle = computed(() =>
+    validationResult.value.errors.some((e) => e.type === "cycle")
+  );
+
+  // Get nodes involved in validation errors
+  const errorNodeIds = computed(() => {
+    const ids = new Set<string>();
+    validationResult.value.errors.forEach((error) => {
+      error.nodeIds?.forEach((id) => ids.add(id));
+    });
+    return ids;
+  });
+
+  // Get edges involved in validation errors
+  const errorEdgeIds = computed(() => {
+    const ids = new Set<string>();
+    validationResult.value.errors.forEach((error) => {
+      if (error.edgeId) ids.add(error.edgeId);
+    });
+    return ids;
+  });
 
   // ============ NODE ACTIONS ============
 
@@ -132,15 +172,58 @@ export const useWorkflowStore = defineStore("workflow", () => {
   }
 
   /**
-   * Update node data
+   * Validate node data using Zod schema
+   */
+  function validateNode(nodeId: string): {
+    valid: boolean;
+    errors: string[];
+  } {
+    const node = nodes.value.find((n) => n.id === nodeId);
+    if (!node) {
+      return { valid: false, errors: ["Node not found"] };
+    }
+
+    const result = validateNodeData(node.data);
+    if (result.success) {
+      return { valid: true, errors: [] };
+    }
+
+    const errors = result.error.issues.map(
+      (issue) => `${issue.path.join(".")}: ${issue.message}`
+    );
+    return { valid: false, errors };
+  }
+
+  /**
+   * Update node data with optional Zod validation
    */
   function updateNodeData<T extends WorkflowNodeData>(
     nodeId: string,
-    data: Partial<T>
+    data: Partial<T>,
+    options?: { validate?: boolean }
   ) {
     const node = nodes.value.find((n) => n.id === nodeId);
     if (node) {
-      node.data = { ...node.data, ...data } as WorkflowNodeData;
+      const newData = { ...node.data, ...data } as WorkflowNodeData;
+
+      // Optionally validate the updated data
+      if (options?.validate) {
+        const schema = getNodeSchema(newData.type);
+        const result = schema.safeParse(newData);
+
+        if (!result.success) {
+          // Update isValid based on validation
+          newData.isValid = false;
+          console.warn(
+            "Node data validation failed:",
+            result.error.issues.map((i) => i.message)
+          );
+        } else {
+          newData.isValid = true;
+        }
+      }
+
+      node.data = newData;
     }
   }
 
@@ -157,15 +240,27 @@ export const useWorkflowStore = defineStore("workflow", () => {
     }
   }
 
+  // ============ VALIDATION ACTIONS ============
+
+  /**
+   * Run full graph validation
+   */
+  function runValidation() {
+    validationResult.value = validateWorkflowGraph(nodes.value, edges.value);
+  }
+
   // ============ EDGE ACTIONS ============
 
   /**
    * Check if a connection between two nodes is valid
+   * Now includes: cycle detection, type compatibility, and domain rules
    */
   function canConnect(
     sourceId: string,
-    targetId: string
-  ): { allowed: boolean; reason?: string } {
+    targetId: string,
+    sourceHandle?: string,
+    targetHandle?: string
+  ): { allowed: boolean; reason?: string; errors?: string[] } {
     const sourceNode = nodes.value.find((n) => n.id === sourceId);
     const targetNode = nodes.value.find((n) => n.id === targetId);
 
@@ -176,7 +271,7 @@ export const useWorkflowStore = defineStore("workflow", () => {
     const sourceType = sourceNode.data.type;
     const targetType = targetNode.data.type;
 
-    // Constraint 2: Manual trigger and webhook node cannot be connected just after each other
+    // Constraint: Manual trigger and webhook node cannot be connected directly
     const isTriggerToTrigger =
       (sourceType === WorkflowNodeType.TRIGGER_MANUAL &&
         targetType === WorkflowNodeType.TRIGGER_WEBHOOK) ||
@@ -190,19 +285,38 @@ export const useWorkflowStore = defineStore("workflow", () => {
       };
     }
 
+    // Run comprehensive validation including cycle detection and type checking
+    const validation = validateNewConnection(
+      nodes.value,
+      edges.value,
+      sourceId,
+      targetId,
+      sourceHandle,
+      targetHandle
+    );
+
+    if (!validation.valid) {
+      return {
+        allowed: false,
+        reason: validation.errors[0],
+        errors: validation.errors,
+      };
+    }
+
     return { allowed: true };
   }
 
   /**
-   * Add a new edge
+   * Add a new edge with validation and conditional styling
    */
   function addEdge(
     source: string,
     target: string,
-    sourceHandle?: string
+    sourceHandle?: string,
+    targetHandle?: string
   ): WorkflowEdge | null {
-    // Check connection constraints
-    const validation = canConnect(source, target);
+    // Check connection constraints including cycle and type checks
+    const validation = canConnect(source, target, sourceHandle, targetHandle);
     if (!validation.allowed) {
       console.warn(`Cannot connect nodes: ${validation.reason}`);
       return null;
@@ -216,15 +330,28 @@ export const useWorkflowStore = defineStore("workflow", () => {
       return existingEdge as WorkflowEdge;
     }
 
+    // Get edge styling for conditional branches
+    const edgeStyle = getEdgeStyle(sourceHandle);
+
     const newEdge: WorkflowEdge = {
       id,
       source,
       target,
       sourceHandle,
+      targetHandle,
       animated: true,
+      style: { stroke: edgeStyle.color },
+      data: {
+        label: edgeStyle.label,
+        condition: sourceHandle as "true" | "false" | undefined,
+      },
     };
 
     edges.value = [...edges.value, newEdge];
+    
+    // Re-run validation after adding edge
+    runValidation();
+    
     return newEdge;
   }
 
@@ -328,17 +455,21 @@ export const useWorkflowStore = defineStore("workflow", () => {
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  // Auto-save when nodes or edges change
+  // Auto-save and validate when nodes or edges change
   watch(
     [nodes, edges],
     () => {
       saveToStorage();
+      runValidation();
     },
     { deep: true }
   );
 
   // Load from storage on initialization
   loadFromStorage();
+  
+  // Run initial validation
+  runValidation();
 
   return {
     // State
@@ -348,6 +479,7 @@ export const useWorkflowStore = defineStore("workflow", () => {
     activeNodeId,
     isDragging,
     draggedNodeType,
+    validationResult,
 
     // Getters
     activeNode,
@@ -358,9 +490,19 @@ export const useWorkflowStore = defineStore("workflow", () => {
     hasManualTrigger,
     hasWebhookTrigger,
 
+    // Validation Getters
+    graphErrors,
+    graphWarnings,
+    isGraphValid,
+    hasCycle,
+    errorNodeIds,
+    errorEdgeIds,
+
     // Validation
     canAddNode,
     canConnect,
+    runValidation,
+    validateNode,
 
     // Node Actions
     addNode,

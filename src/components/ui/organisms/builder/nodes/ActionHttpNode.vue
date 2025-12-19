@@ -1,17 +1,27 @@
 <script setup lang="ts">
 import type { NodeProps } from "@vue-flow/core";
 import type { HttpActionData } from "@/types/workflow";
-import BaseNode from "./BaseNode.vue";
 
 interface Props extends NodeProps {
   data: HttpActionData;
 }
 
 const props = defineProps<Props>();
+
+// HTTP Request has two output handles: success and error
+const sourceHandles = [
+  { id: "success", label: "Success" },
+  { id: "error", label: "Error" },
+];
 </script>
 
 <template>
-  <BaseNode v-bind="$props" icon="🌐" color="#3b82f6">
+  <BaseNode
+    v-bind="$props"
+    icon="🌐"
+    color="#3b82f6"
+    :source-handles="sourceHandles"
+  >
     <div class="space-y-1">
       <div class="flex items-center gap-1">
         <span
@@ -36,6 +46,10 @@ const props = defineProps<Props>();
         >
         <span>⏱️ {{ props.data.timeout }}s</span>
         <span class="uppercase">{{ props.data.bodyType }}</span>
+      </div>
+      <div class="flex items-center gap-4 text-[10px] mt-2">
+        <span class="text-green-600">✓ Success</span>
+        <span class="text-red-600">✗ Error</span>
       </div>
     </div>
   </BaseNode>

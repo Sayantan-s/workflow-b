@@ -138,7 +138,12 @@ export type WorkflowNode = Node<WorkflowNodeData>;
 // ============ WORKFLOW EDGE ============
 export type WorkflowEdge = Edge & {
   data?: {
-    condition?: "true" | "false";
+    condition?: "true" | "false" | "success" | "error";
+    label?: string | null;
+  };
+  style?: {
+    stroke?: string;
+    strokeWidth?: number;
   };
 };
 
