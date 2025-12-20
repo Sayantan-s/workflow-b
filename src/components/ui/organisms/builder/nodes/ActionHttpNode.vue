@@ -2,28 +2,17 @@
 import type { NodeProps } from "@vue-flow/core";
 import type { HttpActionData } from "@/types/workflow";
 import { Globe } from "lucide-vue-next";
-import {
-  BaseNode,
-  BaseNodeHeader,
-  BaseNodeContent,
-  BaseNodeHandle,
-} from "./base";
 
 interface Props extends NodeProps {
   data: HttpActionData;
 }
 
 const props = defineProps<Props>();
-
-// HTTP has two output handles: success and error
-const sourceHandles = [
-  { id: "success", label: "Success" },
-  { id: "error", label: "Error" },
-];
 </script>
 
 <template>
   <BaseNode v-bind="$props" color="#3b82f6">
+    <!-- Target handle (input) -->
     <BaseNodeHandle type="target" />
 
     <BaseNodeHeader>
@@ -59,13 +48,9 @@ const sourceHandles = [
           <span>⏱️ {{ props.data.timeout }}s</span>
           <span class="uppercase">{{ props.data.bodyType }}</span>
         </div>
-        <div class="flex items-center gap-4 text-[10px] mt-2">
-          <span class="text-green-600">✓ Success</span>
-          <span class="text-red-600">✗ Error</span>
-        </div>
       </div>
     </BaseNodeContent>
 
-    <BaseNodeHandle type="source" :handles="sourceHandles" />
+    <BaseNodeHandle type="source" />
   </BaseNode>
 </template>

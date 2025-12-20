@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { watch } from "vue";
 import { VueFlow, useVueFlow, ConnectionMode } from "@vue-flow/core";
-import type { Connection } from "@vue-flow/core";
+import type { Connection, ValidConnectionFunc } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { MiniMap } from "@vue-flow/minimap";
 import { toast } from "vue-sonner";
@@ -25,6 +25,51 @@ const workflowStore = useWorkflowStore();
 
 const { onConnect, onNodesChange, onEdgesChange, project, vueFlowRef } =
   useVueFlow();
+
+// Check if a handle ID is a source handle
+function isSourceHandle(handleId: string | null | undefined): boolean {
+  if (!handleId) return false;
+  return handleId === "source" || handleId.startsWith("source__");
+}
+
+// Check if a handle ID is a target handle
+function isTargetHandle(handleId: string | null | undefined): boolean {
+  if (!handleId) return false;
+  return handleId === "target" || handleId.startsWith("target__");
+}
+
+// Validate that connections are only source -> target
+const isValidConnection: ValidConnectionFunc = (connection: Connection) => {
+  // Ensure we have the required handles
+  if (!connection.source || !connection.target) return false;
+
+  // Prevent self-connections
+  if (connection.source === connection.target) return false;
+
+  const sourceHandleId = connection.sourceHandle;
+  const targetHandleId = connection.targetHandle;
+
+  // Check that source handle is actually a source type
+  // and target handle is actually a target type
+  const sourceIsSource = isSourceHandle(sourceHandleId);
+  const targetIsTarget = isTargetHandle(targetHandleId);
+
+  // Valid: source handle → target handle
+  if (sourceIsSource && targetIsTarget) {
+    return true;
+  }
+
+  // Also valid: target handle → source handle (Vue Flow swaps these)
+  const sourceIsTarget = isTargetHandle(sourceHandleId);
+  const targetIsSource = isSourceHandle(targetHandleId);
+
+  if (sourceIsTarget && targetIsSource) {
+    return true;
+  }
+
+  // Invalid: same type connections (source→source or target→target)
+  return false;
+};
 
 // Handle connection between nodes with validation
 onConnect((connection: Connection) => {
@@ -150,6 +195,7 @@ function onPaneClick() {
     :snap-to-grid="true"
     :snap-grid="[15, 15]"
     :connection-mode="ConnectionMode.Strict"
+    :is-valid-connection="isValidConnection"
     :delete-key-code="['Backspace', 'Delete']"
     :multi-selection-key-code="['Meta', 'Control']"
     :selection-key-code="['Shift']"
@@ -224,12 +270,12 @@ function onPaneClick() {
 
 /* Custom edge styling */
 .vue-flow__edge-path {
-  stroke: #6366f1;
+  stroke: #3b82f6;
   stroke-width: 2;
 }
 
 .vue-flow__edge.selected .vue-flow__edge-path {
-  stroke: #4f46e5;
+  stroke: #2563eb;
   stroke-width: 3;
 }
 
@@ -249,15 +295,15 @@ function onPaneClick() {
 
 /* Connection line styling */
 .vue-flow__connection-line path {
-  stroke: #6366f1;
+  stroke: #3b82f6;
   stroke-width: 2;
   stroke-dasharray: 5, 5;
 }
 
 /* Selection box */
 .vue-flow__selection {
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px dashed #6366f1;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px dashed #3b82f6;
 }
 
 /* Handle hover effects */

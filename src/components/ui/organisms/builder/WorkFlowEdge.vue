@@ -7,21 +7,39 @@ import {
   useVueFlow,
 } from "@vue-flow/core";
 import { computed } from "vue";
-import { Plus, ChevronRight } from "lucide-vue-next";
+import { Plus } from "lucide-vue-next";
 import { useWorkflowStore } from "@/stores/workflow";
 
-interface ExtendedEdgeProps extends EdgeProps {
-  data?: {
-    label?: string | null;
-    condition?: "true" | "false" | "success" | "error";
-  };
+interface EdgeData {
+  label?: string | null;
+  condition?: "true" | "false" | "success" | "error";
 }
+
+type ExtendedEdgeProps = EdgeProps<EdgeData>;
 
 const props = defineProps<ExtendedEdgeProps>();
 const workflowStore = useWorkflowStore();
 const { getNodes } = useVueFlow();
 
 const path = computed(() => getBezierPath(props));
+
+// Extract base handle ID from prefixed handle ID (e.g., "source__true" -> "true")
+function getBaseHandleId(handleId?: string | null): string | undefined {
+  if (!handleId) return undefined;
+  if (handleId.includes("__")) {
+    return handleId.split("__")[1];
+  }
+  // For non-prefixed IDs like "source" or "target", return undefined
+  if (handleId === "source" || handleId === "target") {
+    return undefined;
+  }
+  return handleId;
+}
+
+// Get the base source handle ID for styling
+const baseSourceHandleId = computed(() =>
+  getBaseHandleId(props.sourceHandleId)
+);
 
 // Check if this edge has an error
 const hasError = computed(() => workflowStore.errorEdgeIds.has(props.id));
@@ -45,7 +63,7 @@ const edgeEndPosition = computed(() => {
 const edgeColor = computed(() => {
   if (hasError.value) return "#ef4444"; // Red for errors
 
-  const condition = props.data?.condition || props.sourceHandleId;
+  const condition = props.data?.condition || baseSourceHandleId.value;
   switch (condition) {
     case "true":
     case "success":
@@ -54,7 +72,7 @@ const edgeColor = computed(() => {
     case "error":
       return "#ef4444"; // Red
     default:
-      return "#6366f1"; // Default indigo
+      return "#3b82f6"; // Default blue (matching source handle color)
   }
 });
 
@@ -62,7 +80,7 @@ const edgeColor = computed(() => {
 const edgeLabel = computed(() => {
   if (props.data?.label) return props.data.label;
 
-  const handleId = props.sourceHandleId;
+  const handleId = baseSourceHandleId.value;
   switch (handleId) {
     case "true":
       return "True";
@@ -79,7 +97,7 @@ const edgeLabel = computed(() => {
 
 // Label background color
 const labelBgColor = computed(() => {
-  const condition = props.data?.condition || props.sourceHandleId;
+  const condition = props.data?.condition || baseSourceHandleId.value;
   switch (condition) {
     case "true":
     case "success":
@@ -95,7 +113,7 @@ const labelBgColor = computed(() => {
 // Handle plus button click
 function onPlusClick(event: MouseEvent) {
   event.stopPropagation();
-  
+
   // Get the source node to calculate position
   const sourceNode = getNodes.value.find((n) => n.id === props.source);
   if (!sourceNode) return;
@@ -143,10 +161,7 @@ export default {
       orient="auto"
       markerUnits="userSpaceOnUse"
     >
-      <path
-        d="M2,2 L10,6 L2,10 L4,6 Z"
-        :fill="edgeColor"
-      />
+      <path d="M2,2 L10,6 L2,10 L4,6 Z" :fill="edgeColor" />
     </marker>
   </defs>
 

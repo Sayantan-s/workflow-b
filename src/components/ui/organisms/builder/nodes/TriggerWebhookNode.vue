@@ -21,7 +21,8 @@ const label = computed(() => props.data.label || "Webhook");
 
 <template>
   <BaseNode v-bind="$props" color="#22c55e">
-    <!-- No target handle since this is a trigger node -->
+    <!-- Target handle (webhook can receive from other nodes) -->
+    <BaseNodeHandle type="target" />
 
     <!-- Header with icon -->
     <BaseNodeHeader>
