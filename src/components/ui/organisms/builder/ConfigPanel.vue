@@ -21,37 +21,37 @@ const isOpen = computed(() => activeNode.value !== null);
 
 // Type-safe data getters
 const webhookData = computed(() =>
-  activeNode.value?.data.type === WorkflowNodeType.TRIGGER_WEBHOOK
+  activeNode?.value?.data?.type === WorkflowNodeType.TRIGGER_WEBHOOK
     ? (activeNode.value.data as WebhookTriggerData)
     : null
 );
 const httpData = computed(() =>
-  activeNode.value?.data.type === WorkflowNodeType.ACTION_HTTP
+  activeNode?.value?.data?.type === WorkflowNodeType.ACTION_HTTP
     ? (activeNode.value.data as HttpActionData)
     : null
 );
 const emailData = computed(() =>
-  activeNode.value?.data.type === WorkflowNodeType.ACTION_EMAIL
+  activeNode?.value?.data?.type === WorkflowNodeType.ACTION_EMAIL
     ? (activeNode.value.data as EmailActionData)
     : null
 );
 const smsData = computed(() =>
-  activeNode.value?.data.type === WorkflowNodeType.ACTION_SMS
+  activeNode?.value?.data?.type === WorkflowNodeType.ACTION_SMS
     ? (activeNode.value.data as SmsActionData)
     : null
 );
 const ifElseData = computed(() =>
-  activeNode.value?.data.type === WorkflowNodeType.LOGIC_IF_ELSE
+  activeNode?.value?.data?.type === WorkflowNodeType.LOGIC_IF_ELSE
     ? (activeNode.value.data as IfElseLogicData)
     : null
 );
 const delayData = computed(() =>
-  activeNode.value?.data.type === WorkflowNodeType.LOGIC_DELAY
+  activeNode?.value?.data?.type === WorkflowNodeType.LOGIC_DELAY
     ? (activeNode.value.data as DelayLogicData)
     : null
 );
 const manualTriggerData = computed(() =>
-  activeNode.value?.data.type === WorkflowNodeType.TRIGGER_MANUAL
+  activeNode?.value?.data?.type === WorkflowNodeType.TRIGGER_MANUAL
     ? (activeNode.value.data as ManualTriggerData)
     : null
 );
@@ -59,7 +59,7 @@ const manualTriggerData = computed(() =>
 // Get node definition for icon and color
 const nodeDefinition = computed(() => {
   if (!activeNode.value) return null;
-  return NODE_DEFINITIONS.find((n) => n.type === activeNode.value?.data.type);
+  return NODE_DEFINITIONS.find((n) => n.type === activeNode.value?.data?.type);
 });
 
 // Local form state (synced with store)
@@ -162,7 +162,7 @@ function deleteNode() {
           <div class="space-y-1.5">
             <label class="text-xs font-medium text-gray-600">Label</label>
             <input
-              :value="activeNode.data.label"
+              :value="activeNode?.data?.label"
               type="text"
               class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow"
               placeholder="Node label"
@@ -214,81 +214,8 @@ function deleteNode() {
             </div>
           </template>
 
-          <template v-else-if="httpData">
-            <div class="space-y-1.5">
-              <label class="text-xs font-medium text-gray-600">URL</label>
-              <input
-                :value="httpData.url"
-                type="url"
-                class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="https://api.example.com/endpoint"
-                @input="updateField('url', getInputValue($event))"
-              />
-              <p class="text-[10px] text-gray-400">
-                Use &#123;&#123;variable&#125;&#125; for dynamic values
-              </p>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="space-y-1.5">
-                <label class="text-xs font-medium text-gray-600">Method</label>
-                <select
-                  :value="httpData.method"
-                  class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  @change="updateField('method', getSelectValue($event))"
-                >
-                  <option value="GET">GET</option>
-                  <option value="POST">POST</option>
-                  <option value="PUT">PUT</option>
-                  <option value="PATCH">PATCH</option>
-                  <option value="DELETE">DELETE</option>
-                </select>
-              </div>
-              <div class="space-y-1.5">
-                <label class="text-xs font-medium text-gray-600"
-                  >Timeout (s)</label
-                >
-                <input
-                  :value="httpData.timeout"
-                  type="number"
-                  min="1"
-                  max="300"
-                  class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  @input="
-                    updateField(
-                      'timeout',
-                      parseInt(getInputValue($event)) || 30
-                    )
-                  "
-                />
-              </div>
-            </div>
-            <div class="space-y-1.5">
-              <label class="text-xs font-medium text-gray-600">Body Type</label>
-              <div class="flex gap-2">
-                <button
-                  class="flex-1 px-3 py-1.5 text-xs rounded-md transition-colors"
-                  :class="
-                    httpData.bodyType === 'json'
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'bg-gray-100 text-gray-600'
-                  "
-                  @click="updateField('bodyType', 'json')"
-                >
-                  JSON
-                </button>
-                <button
-                  class="flex-1 px-3 py-1.5 text-xs rounded-md transition-colors"
-                  :class="
-                    httpData.bodyType === 'raw'
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'bg-gray-100 text-gray-600'
-                  "
-                  @click="updateField('bodyType', 'raw')"
-                >
-                  Raw
-                </button>
-              </div>
-            </div>
+          <template v-else-if="httpData && activeNode">
+            <HttpNodeConfig :node-id="activeNode.id" :data="httpData" />
           </template>
 
           <template v-else-if="emailData">

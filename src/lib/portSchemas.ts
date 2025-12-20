@@ -164,6 +164,28 @@ export const NODE_PORT_SCHEMAS: Record<WorkflowNodeType, NodePortSchema> = {
     ],
     isConditional: false,
   },
+
+  [WorkflowNodeType.LOGIC_TRANSFORM]: {
+    inputs: [
+      {
+        id: "input",
+        label: "Source Data",
+        dataType: PortDataType.ANY,
+        acceptsTypes: Object.values(PortDataType),
+        description: "Data to extract values from",
+        required: true,
+      },
+    ],
+    outputs: [
+      {
+        id: "output",
+        label: "Mapped Variables",
+        dataType: PortDataType.JSON,
+        description: "Object containing extracted variables",
+      },
+    ],
+    isConditional: false,
+  },
 };
 
 /**

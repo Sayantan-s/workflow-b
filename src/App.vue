@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import Canvas from "@/components/ui/organisms/builder/Canvas.vue";
-import Pallete from "@/components/ui/organisms/builder/Pallete.vue";
-import Topbar from "@/components/ui/organisms/builder/Topbar.vue";
-import ConfigPanel from "@/components/ui/organisms/builder/ConfigPanel.vue";
+import { Toaster } from "vue-sonner";
 </script>
 
 <template>
@@ -11,4 +8,5 @@ import ConfigPanel from "@/components/ui/organisms/builder/ConfigPanel.vue";
     <Topbar />
     <ConfigPanel />
   </Canvas>
+  <Toaster position="bottom-left" :expand="true" rich-colors />
 </template>

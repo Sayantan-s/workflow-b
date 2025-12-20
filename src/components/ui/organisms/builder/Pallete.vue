@@ -5,7 +5,6 @@ import {
   NODE_DEFINITIONS,
   type NodeType,
   type NodeCategory,
-  WorkflowNodeType,
 } from "@/types/workflow";
 import { useWorkflowStore } from "@/stores/workflow";
 

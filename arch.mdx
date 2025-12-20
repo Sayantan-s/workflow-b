@@ -88,3 +88,19 @@
 
 - Only one manual trigger node is allowed
 - manual trigger and webhook node cannot be connected just after each other
+
+- dragged and exactly dropped on the canvas
+- http / webhook should make actual api calls
+- email / sms can be dummy async defer / sleep logic with random failure and success
+- data accesiblility: node 1 (manual trigger) -> node 2 (http request) -> node 3 (sms) -> node 4(transform)
+  This should work such that whenever I receive a response from any node those values should be stored and can be used in next node
+  incase of transform node, I can extract specific values and store them in variables. These variables should then be usable in subsequent edges or nodes.
+
+vee-validate with zod
+label -> input
+desc -> textarea
+url -> input [url] -> vee-validate with zod
+method -> Select(https://reka-ui.com/docs/components/select) -> reka-ui -> default POST
+timeout(seconds) -> number input -> counter [ - ] <value> [ + ]
+headers -> key value pair
+body -> json (code editor)

@@ -9,6 +9,7 @@ export const WorkflowNodeType = {
   ACTION_SMS: "action:sms",
   LOGIC_IF_ELSE: "logic:if-else",
   LOGIC_DELAY: "logic:delay",
+  LOGIC_TRANSFORM: "logic:transform",
 } as const;
 
 export type WorkflowNodeType =
@@ -120,6 +121,19 @@ export interface DelayLogicData extends BaseNodeData {
   delayValue: number;
 }
 
+// ============ TRANSFORM/MAPPER NODE ============
+export interface VariableMapping {
+  id: string;
+  sourcePath: string; // JSONPath expression (e.g., "$.response.data.userId")
+  variableName: string; // Variable name to store the value (e.g., "userId")
+  defaultValue?: string; // Fallback value if path doesn't exist
+}
+
+export interface TransformLogicData extends BaseNodeData {
+  type: typeof WorkflowNodeType.LOGIC_TRANSFORM;
+  mappings: VariableMapping[];
+}
+
 // ============ UNION TYPES ============
 export type WorkflowNodeData =
   | ManualTriggerData
@@ -128,7 +142,8 @@ export type WorkflowNodeData =
   | EmailActionData
   | SmsActionData
   | IfElseLogicData
-  | DelayLogicData;
+  | DelayLogicData
+  | TransformLogicData;
 
 export type NodeType = WorkflowNodeType;
 
@@ -227,5 +242,14 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     icon: "⏱️",
     color: "#f59e0b",
     shortcut: "Cmd+N+L",
+  },
+  {
+    type: WorkflowNodeType.LOGIC_TRANSFORM,
+    label: "Transform",
+    description: "Extract and map data to variables",
+    category: "logic",
+    icon: "🔄",
+    color: "#f59e0b",
+    shortcut: "Cmd+N+T",
   },
 ];

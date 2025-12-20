@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { VueFlow, useVueFlow } from "@vue-flow/core";
+import { watch } from "vue";
+import { VueFlow, useVueFlow, ConnectionMode } from "@vue-flow/core";
 import type { Connection } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { MiniMap } from "@vue-flow/minimap";
+import { toast } from "vue-sonner";
 import { useWorkflowStore } from "@/stores/workflow";
 import type { NodeType } from "@/types/workflow";
 
@@ -15,6 +17,7 @@ import {
   ActionSmsNode,
   LogicIfElseNode,
   LogicDelayNode,
+  LogicTransformNode,
 } from "./nodes";
 import WorkFlowEdge from "./WorkFlowEdge.vue";
 
@@ -35,8 +38,10 @@ onConnect((connection: Connection) => {
     );
 
     if (!validation.allowed) {
-      // Show validation error (could be replaced with toast notification)
-      console.warn("Connection blocked:", validation.reason);
+      // Show validation error toast
+      toast.error("Connection blocked", {
+        description: validation.reason,
+      });
       return;
     }
 
@@ -48,6 +53,40 @@ onConnect((connection: Connection) => {
     );
   }
 });
+
+// Watch for graph validation errors and show toasts
+watch(
+  () => workflowStore.graphErrors,
+  (errors, oldErrors) => {
+    // Show toast for new errors only
+    const oldMessages = new Set(oldErrors?.map((e) => e.message) ?? []);
+    errors.forEach((error) => {
+      if (!oldMessages.has(error.message)) {
+        toast.error("Validation Error", {
+          description: error.message,
+        });
+      }
+    });
+  },
+  { deep: true }
+);
+
+// Watch for graph warnings and show toasts
+watch(
+  () => workflowStore.graphWarnings,
+  (warnings, oldWarnings) => {
+    // Show toast for new warnings only
+    const oldMessages = new Set(oldWarnings?.map((w) => w.message) ?? []);
+    warnings.forEach((warning) => {
+      if (!oldMessages.has(warning.message)) {
+        toast.warning("Warning", {
+          description: warning.message,
+        });
+      }
+    });
+  },
+  { deep: true }
+);
 
 // Sync node changes back to store
 onNodesChange((changes) => {
@@ -110,7 +149,7 @@ function onPaneClick() {
     :min-zoom="0.25"
     :snap-to-grid="true"
     :snap-grid="[15, 15]"
-    connection-mode="loose"
+    :connection-mode="ConnectionMode.Strict"
     :delete-key-code="['Backspace', 'Delete']"
     :multi-selection-key-code="['Meta', 'Control']"
     :selection-key-code="['Shift']"
@@ -125,12 +164,7 @@ function onPaneClick() {
     }"
   >
     <!-- Background pattern -->
-    <Background
-      :gap="20"
-      :size="1"
-      pattern-color="rgba(99, 102, 241, 0.15)"
-      variant="dots"
-    />
+    <Background :gap="20" :size="1" pattern-color="#99a1af" variant="dots" />
 
     <!-- Mini map -->
     <MiniMap
@@ -168,6 +202,10 @@ function onPaneClick() {
       <LogicDelayNode v-bind="nodeProps" />
     </template>
 
+    <template #node-logicTransform="nodeProps">
+      <LogicTransformNode v-bind="nodeProps" />
+    </template>
+
     <!-- Custom edge template with labels -->
     <template #edge-default="edgeProps">
       <WorkFlowEdge v-bind="edgeProps" />
@@ -175,42 +213,6 @@ function onPaneClick() {
 
     <!-- Slot for additional UI components (Palette, Topbar, ConfigPanel) -->
     <slot />
-
-    <!-- Validation Panel -->
-    <div
-      v-if="workflowStore.graphErrors.length > 0 || workflowStore.graphWarnings.length > 0"
-      class="absolute bottom-4 left-4 max-w-md z-50"
-    >
-      <!-- Errors -->
-      <div
-        v-for="error in workflowStore.graphErrors"
-        :key="`error-${error.message}`"
-        class="mb-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg shadow-lg"
-      >
-        <div class="flex items-start gap-2">
-          <span class="text-red-500 text-lg">⚠️</span>
-          <div>
-            <p class="text-sm font-semibold text-red-700">Validation Error</p>
-            <p class="text-xs text-red-600 mt-0.5">{{ error.message }}</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Warnings -->
-      <div
-        v-for="warning in workflowStore.graphWarnings"
-        :key="`warning-${warning.message}`"
-        class="mb-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg shadow-lg"
-      >
-        <div class="flex items-start gap-2">
-          <span class="text-amber-500 text-lg">💡</span>
-          <div>
-            <p class="text-sm font-semibold text-amber-700">Warning</p>
-            <p class="text-xs text-amber-600 mt-0.5">{{ warning.message }}</p>
-          </div>
-        </div>
-      </div>
-    </div>
   </VueFlow>
 </template>
 

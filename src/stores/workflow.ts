@@ -54,27 +54,27 @@ export const useWorkflowStore = defineStore("workflow", () => {
   );
 
   const nodesByCategory = computed(() => ({
-    triggers: nodes.value.filter((n) => n.data.type.startsWith("trigger:")),
-    actions: nodes.value.filter((n) => n.data.type.startsWith("action:")),
-    logic: nodes.value.filter((n) => n.data.type.startsWith("logic:")),
+    triggers: nodes.value.filter((n) => n?.data?.type?.startsWith("trigger:")),
+    actions: nodes.value.filter((n) => n?.data?.type?.startsWith("action:")),
+    logic: nodes.value.filter((n) => n?.data?.type?.startsWith("logic:")),
   }));
 
   const isWorkflowValid = computed(
-    () => nodes.value.length > 0 && nodes.value.every((n) => n.data.isValid)
+    () => nodes.value.length > 0 && nodes.value.every((n) => n?.data?.isValid)
   );
 
   const hasTrigger = computed(() =>
-    nodes.value.some((n) => n.data.type.startsWith("trigger:"))
+    nodes.value.some((n) => n?.data?.type?.startsWith("trigger:"))
   );
 
   // Check if manual trigger already exists (Constraint: only one allowed)
   const hasManualTrigger = computed(() =>
-    nodes.value.some((n) => n.data.type === WorkflowNodeType.TRIGGER_MANUAL)
+    nodes.value.some((n) => n?.data?.type === WorkflowNodeType.TRIGGER_MANUAL)
   );
 
   // Check if webhook trigger exists
   const hasWebhookTrigger = computed(() =>
-    nodes.value.some((n) => n.data.type === WorkflowNodeType.TRIGGER_WEBHOOK)
+    nodes.value.some((n) => n?.data?.type === WorkflowNodeType.TRIGGER_WEBHOOK)
   );
 
   // Validation getters
@@ -268,8 +268,12 @@ export const useWorkflowStore = defineStore("workflow", () => {
       return { allowed: false, reason: "Source or target node not found" };
     }
 
-    const sourceType = sourceNode.data.type;
-    const targetType = targetNode.data.type;
+    const sourceType = sourceNode?.data?.type;
+    const targetType = targetNode?.data?.type ?? "";
+
+    if (!sourceType || !targetType) {
+      return { allowed: false, reason: "Source or target node type not found" };
+    }
 
     // Constraint: Manual trigger and webhook node cannot be connected directly
     const isTriggerToTrigger =
@@ -348,10 +352,10 @@ export const useWorkflowStore = defineStore("workflow", () => {
     };
 
     edges.value = [...edges.value, newEdge];
-    
+
     // Re-run validation after adding edge
     runValidation();
-    
+
     return newEdge;
   }
 
@@ -467,7 +471,7 @@ export const useWorkflowStore = defineStore("workflow", () => {
 
   // Load from storage on initialization
   loadFromStorage();
-  
+
   // Run initial validation
   runValidation();
 

@@ -86,6 +86,15 @@ export function createDefaultNodeData(type: NodeType): WorkflowNodeData {
         isValid: true, // Delay with default values is valid
       };
 
+    case WorkflowNodeType.LOGIC_TRANSFORM:
+      return {
+        ...base,
+        type: WorkflowNodeType.LOGIC_TRANSFORM,
+        label: "Transform",
+        description: "Extract and map data to variables",
+        mappings: [],
+      };
+
     default:
       throw new Error(`Unknown node type: ${type}`);
   }
@@ -103,6 +112,7 @@ export function getVueFlowNodeType(type: NodeType): string {
     [WorkflowNodeType.ACTION_SMS]: "actionSms",
     [WorkflowNodeType.LOGIC_IF_ELSE]: "logicIfElse",
     [WorkflowNodeType.LOGIC_DELAY]: "logicDelay",
+    [WorkflowNodeType.LOGIC_TRANSFORM]: "logicTransform",
   };
   return mapping[type];
 }
