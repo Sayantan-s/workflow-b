@@ -17,8 +17,14 @@ interface Props extends NodeProps {
 const props = defineProps<Props>();
 
 const delayText = computed(() => {
-  const { delayValue, delayType } = props.data;
-  const unit = delayType === "hours" ? "hour" : "day";
+  const { delayValue, delayUnit } = props.data;
+  const unitMap: Record<string, string> = {
+    seconds: "second",
+    minutes: "minute",
+    hours: "hour",
+    days: "day",
+  };
+  const unit = unitMap[delayUnit] || delayUnit;
   return `${delayValue} ${unit}${delayValue !== 1 ? "s" : ""}`;
 });
 </script>

@@ -64,6 +64,7 @@ export function createDefaultNodeData(type: NodeType): WorkflowNodeData {
         ...base,
         type: WorkflowNodeType.ACTION_SMS,
         label: "Send SMS",
+        fromNumber: "",
         toNumber: "",
         message: "",
       };
@@ -73,7 +74,7 @@ export function createDefaultNodeData(type: NodeType): WorkflowNodeData {
         ...base,
         type: WorkflowNodeType.LOGIC_IF_ELSE,
         label: "If/Else",
-        conditions: [{ field: "", operator: "equals", value: "" }],
+        conditions: [{ field: "", operator: "equals", valueType: "string", value: "" }],
       };
 
     case WorkflowNodeType.LOGIC_DELAY:
@@ -81,7 +82,7 @@ export function createDefaultNodeData(type: NodeType): WorkflowNodeData {
         ...base,
         type: WorkflowNodeType.LOGIC_DELAY,
         label: "Delay",
-        delayType: "hours",
+        delayUnit: "minutes",
         delayValue: 1,
         isValid: true, // Delay with default values is valid
       };

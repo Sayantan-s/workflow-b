@@ -96,6 +96,7 @@
   This should work such that whenever I receive a response from any node those values should be stored and can be used in next node
   incase of transform node, I can extract specific values and store them in variables. These variables should then be usable in subsequent edges or nodes.
 
+http
 vee-validate with zod
 label -> input
 desc -> textarea
@@ -104,3 +105,42 @@ method -> Select(https://reka-ui.com/docs/components/select) -> reka-ui -> defau
 timeout(seconds) -> number input -> counter [ - ] <value> [ + ]
 headers -> key value pair
 body -> json (code editor)
+
+webhook
+vee-validate with zod
+url -> input [url] -> vee-validate with zod
+method -> Select(https://reka-ui.com/docs/components/select) -> reka-ui -> default POST
+timeout(seconds) -> number input -> counter [ - ] <value> [ + ]
+headers -> key value pair
+
+email
+vee-validate with zod
+from -> input [email]
+to -> tags-input -> you can build a seperate component for that
+
+{" "}
+
+<EmailSender /> (can change the naming according to use cases.) - normal email
+tags - cc tags - bcc tags [build them according to better use case] subject:
+input[text] body: richtexteditor (have install quill for that)
+
+sms
+vee-validate with zod
+from -> input [phone]
+to -> input [phone]
+message -> textarea
+
+delay
+vee-validate with zod
+Delay Duration -> -> number input -> counter [ - ] <value> [ + ]
+Metrics
+method -> Select [seconds, minutes, hours, day]
+
+ifelse
+vee-validate with zod
+Array[
+Field Name [input]
+Condition [select]
+type [select] [number, string, boolean]
+value -> [input]
+] -> Muliple, if added atleast one.

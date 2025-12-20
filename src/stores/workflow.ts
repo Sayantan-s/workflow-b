@@ -37,6 +37,14 @@ export const useWorkflowStore = defineStore("workflow", () => {
   const isDragging = ref(false);
   const draggedNodeType = ref<NodeType | null>(null);
 
+  // Palette drawer state
+  const isPaletteOpen = ref(false);
+  const pendingEdgeConnection = ref<{
+    sourceNodeId: string;
+    sourceHandle?: string;
+    position: { x: number; y: number };
+  } | null>(null);
+
   // Validation state
   const validationResult = ref<ValidationResult>({
     isValid: true,
@@ -419,6 +427,74 @@ export const useWorkflowStore = defineStore("workflow", () => {
     draggedNodeType.value = null;
   }
 
+  // ============ PALETTE DRAWER ACTIONS ============
+
+  /**
+   * Open palette drawer (optionally from an edge plus button)
+   */
+  function openPalette(edgeContext?: {
+    sourceNodeId: string;
+    sourceHandle?: string;
+    position: { x: number; y: number };
+  }) {
+    isPaletteOpen.value = true;
+    pendingEdgeConnection.value = edgeContext ?? null;
+  }
+
+  /**
+   * Close palette drawer
+   */
+  function closePalette() {
+    isPaletteOpen.value = false;
+    pendingEdgeConnection.value = null;
+  }
+
+  /**
+   * Add node from palette to a pending edge connection
+   */
+  function addNodeFromEdge(type: NodeType): WorkflowNode | null {
+    if (!pendingEdgeConnection.value) return null;
+
+    const { sourceNodeId, sourceHandle, position } =
+      pendingEdgeConnection.value;
+
+    // Add the new node at the position
+    const newNode = addNode(type, position);
+    if (!newNode) return null;
+
+    // Connect the source to the new node
+    addEdge(sourceNodeId, newNode.id, sourceHandle);
+
+    // Close the palette
+    closePalette();
+
+    return newNode;
+  }
+
+  /**
+   * Check if a node has outgoing edges from a specific handle
+   */
+  function hasOutgoingEdge(nodeId: string, handleId?: string): boolean {
+    return edges.value.some(
+      (e) =>
+        e.source === nodeId && (handleId ? e.sourceHandle === handleId : true)
+    );
+  }
+
+  /**
+   * Get the end position for an edge (for plus button placement)
+   */
+  function getEdgeEndPosition(nodeId: string): { x: number; y: number } | null {
+    const node = nodes.value.find((n) => n.id === nodeId);
+    if (!node) return null;
+
+    // Calculate position to the right of the source node
+    return {
+      x: node.position.x + 300,
+      y: node.position.y + 50,
+    };
+  }
+
   // ============ PERSISTENCE ============
 
   /**
@@ -484,6 +560,8 @@ export const useWorkflowStore = defineStore("workflow", () => {
     isDragging,
     draggedNodeType,
     validationResult,
+    isPaletteOpen,
+    pendingEdgeConnection,
 
     // Getters
     activeNode,
@@ -517,6 +595,8 @@ export const useWorkflowStore = defineStore("workflow", () => {
     // Edge Actions
     addEdge,
     removeEdges,
+    hasOutgoingEdge,
+    getEdgeEndPosition,
 
     // Selection Actions
     setActiveNode,
@@ -527,6 +607,11 @@ export const useWorkflowStore = defineStore("workflow", () => {
     // Drag & Drop
     startDrag,
     endDrag,
+
+    // Palette Drawer
+    openPalette,
+    closePalette,
+    addNodeFromEdge,
 
     // Persistence
     saveToStorage,

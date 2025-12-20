@@ -98,14 +98,19 @@ export interface EmailActionData extends BaseNodeData {
 
 export interface SmsActionData extends BaseNodeData {
   type: typeof WorkflowNodeType.ACTION_SMS;
+  fromNumber: string;
   toNumber: string;
   message: string;
 }
 
 // ============ LOGIC NODES ============
+export type ConditionOperator = "equals" | "notEquals" | "contains" | "gt" | "lt" | "isEmpty";
+export type ConditionValueType = "string" | "number" | "boolean";
+
 export interface Condition {
   field: string;
-  operator: "equals" | "notEquals" | "contains" | "gt" | "lt" | "isEmpty";
+  operator: ConditionOperator;
+  valueType: ConditionValueType;
   value: string;
   logicalOp?: "AND" | "OR";
 }
@@ -115,9 +120,11 @@ export interface IfElseLogicData extends BaseNodeData {
   conditions: Condition[];
 }
 
+export type DelayUnit = "seconds" | "minutes" | "hours" | "days";
+
 export interface DelayLogicData extends BaseNodeData {
   type: typeof WorkflowNodeType.LOGIC_DELAY;
-  delayType: "hours" | "days";
+  delayUnit: DelayUnit;
   delayValue: number;
 }
 

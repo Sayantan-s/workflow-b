@@ -87,10 +87,6 @@ function getInputValue(event: Event): string {
   return (event.target as HTMLInputElement).value;
 }
 
-function getSelectValue(event: Event): string {
-  return (event.target as HTMLSelectElement).value;
-}
-
 function getTextAreaValue(event: Event): string {
   return (event.target as HTMLTextAreaElement).value;
 }
@@ -185,137 +181,24 @@ function deleteNode() {
           <hr class="border-gray-100" />
 
           <!-- Type-specific fields -->
-          <template v-if="webhookData">
-            <div class="space-y-1.5">
-              <label class="text-xs font-medium text-gray-600"
-                >Webhook URL</label
-              >
-              <input
-                :value="webhookData.webhookUrl"
-                type="url"
-                class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="https://example.com/webhook"
-                @input="updateField('webhookUrl', getInputValue($event))"
-              />
-            </div>
-            <div class="space-y-1.5">
-              <label class="text-xs font-medium text-gray-600">Method</label>
-              <select
-                :value="webhookData.method"
-                class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                @change="updateField('method', getSelectValue($event))"
-              >
-                <option value="GET">GET</option>
-                <option value="POST">POST</option>
-                <option value="PUT">PUT</option>
-                <option value="PATCH">PATCH</option>
-                <option value="DELETE">DELETE</option>
-              </select>
-            </div>
+          <template v-if="webhookData && activeNode">
+            <WebhookNodeConfig :node-id="activeNode.id" :data="webhookData" />
           </template>
 
           <template v-else-if="httpData && activeNode">
             <HttpNodeConfig :node-id="activeNode.id" :data="httpData" />
           </template>
 
-          <template v-else-if="emailData">
-            <div class="space-y-1.5">
-              <label class="text-xs font-medium text-gray-600">To</label>
-              <input
-                :value="emailData.recipients?.to?.join(', ')"
-                type="text"
-                class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="email@example.com, ..."
-                @input="
-                  updateField('recipients', {
-                    ...emailData.recipients,
-                    to: getInputValue($event)
-                      .split(',')
-                      .map((s) => s.trim())
-                      .filter(Boolean),
-                  })
-                "
-              />
-            </div>
-            <div class="space-y-1.5">
-              <label class="text-xs font-medium text-gray-600">Subject</label>
-              <input
-                :value="emailData.subject"
-                type="text"
-                class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="Email subject"
-                @input="updateField('subject', getInputValue($event))"
-              />
-            </div>
-            <div class="space-y-1.5">
-              <label class="text-xs font-medium text-gray-600">Body</label>
-              <textarea
-                :value="emailData.body"
-                rows="4"
-                class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                placeholder="Email body content"
-                @input="updateField('body', getTextAreaValue($event))"
-              />
-            </div>
+          <template v-else-if="emailData && activeNode">
+            <EmailNodeConfig :node-id="activeNode.id" :data="emailData" />
           </template>
 
-          <template v-else-if="smsData">
-            <div class="space-y-1.5">
-              <label class="text-xs font-medium text-gray-600">To Number</label>
-              <input
-                :value="smsData.toNumber"
-                type="tel"
-                class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="+1234567890"
-                @input="updateField('toNumber', getInputValue($event))"
-              />
-            </div>
-            <div class="space-y-1.5">
-              <label class="text-xs font-medium text-gray-600">
-                Message
-                <span class="text-gray-400 font-normal"
-                  >({{ smsData.message?.length || 0 }}/160)</span
-                >
-              </label>
-              <textarea
-                :value="smsData.message"
-                rows="3"
-                maxlength="160"
-                class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                placeholder="SMS message"
-                @input="updateField('message', getTextAreaValue($event))"
-              />
-            </div>
+          <template v-else-if="smsData && activeNode">
+            <SmsNodeConfig :node-id="activeNode.id" :data="smsData" />
           </template>
 
-          <template v-else-if="delayData">
-            <div class="space-y-1.5">
-              <label class="text-xs font-medium text-gray-600"
-                >Delay Duration</label
-              >
-              <div class="flex gap-2">
-                <input
-                  :value="delayData.delayValue"
-                  type="number"
-                  min="1"
-                  class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  @input="
-                    updateField(
-                      'delayValue',
-                      parseInt(getInputValue($event)) || 1
-                    )
-                  "
-                />
-                <select
-                  :value="delayData.delayType"
-                  class="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  @change="updateField('delayType', getSelectValue($event))"
-                >
-                  <option value="hours">Hours</option>
-                  <option value="days">Days</option>
-                </select>
-              </div>
-            </div>
+          <template v-else-if="delayData && activeNode">
+            <DelayNodeConfig :node-id="activeNode.id" :data="delayData" />
           </template>
 
           <template v-else-if="manualTriggerData">
@@ -327,62 +210,8 @@ function deleteNode() {
             </div>
           </template>
 
-          <template v-else-if="ifElseData">
-            <div class="space-y-1.5">
-              <label class="text-xs font-medium text-gray-600">Condition</label>
-              <p class="text-[10px] text-gray-400 mb-2">
-                Define when to follow the True or False branch
-              </p>
-              <div class="space-y-2">
-                <input
-                  :value="ifElseData.conditions?.[0]?.field"
-                  type="text"
-                  class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  placeholder="Field name (e.g., response.status)"
-                  @input="
-                    updateField('conditions', [
-                      {
-                        ...ifElseData.conditions?.[0],
-                        field: getInputValue($event),
-                      },
-                    ])
-                  "
-                />
-                <select
-                  :value="ifElseData.conditions?.[0]?.operator"
-                  class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  @change="
-                    updateField('conditions', [
-                      {
-                        ...ifElseData.conditions?.[0],
-                        operator: getSelectValue($event),
-                      },
-                    ])
-                  "
-                >
-                  <option value="equals">Equals</option>
-                  <option value="notEquals">Not Equals</option>
-                  <option value="contains">Contains</option>
-                  <option value="gt">Greater Than</option>
-                  <option value="lt">Less Than</option>
-                  <option value="isEmpty">Is Empty</option>
-                </select>
-                <input
-                  :value="ifElseData.conditions?.[0]?.value"
-                  type="text"
-                  class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  placeholder="Value to compare"
-                  @input="
-                    updateField('conditions', [
-                      {
-                        ...ifElseData.conditions?.[0],
-                        value: getInputValue($event),
-                      },
-                    ])
-                  "
-                />
-              </div>
-            </div>
+          <template v-else-if="ifElseData && activeNode">
+            <IfElseNodeConfig :node-id="activeNode.id" :data="ifElseData" />
           </template>
         </div>
 
