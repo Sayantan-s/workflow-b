@@ -5,10 +5,12 @@ import {
   getBezierPath,
   type EdgeProps,
   useVueFlow,
+  getSimpleBezierPath,
 } from "@vue-flow/core";
 import { computed } from "vue";
 import { Plus } from "lucide-vue-next";
 import { useWorkflowStore } from "@/stores/workflow";
+import { useWorkflowExecution } from "@/stores/execution";
 
 interface EdgeData {
   label?: string | null;
@@ -19,9 +21,10 @@ type ExtendedEdgeProps = EdgeProps<EdgeData>;
 
 const props = defineProps<ExtendedEdgeProps>();
 const workflowStore = useWorkflowStore();
+const executionStore = useWorkflowExecution();
 const { getNodes } = useVueFlow();
 
-const path = computed(() => getBezierPath(props));
+const edgePathParams = computed(() => getSimpleBezierPath(props));
 
 // Extract base handle ID from prefixed handle ID (e.g., "source__true" -> "true")
 function getBaseHandleId(handleId?: string | null): string | undefined {
@@ -41,8 +44,10 @@ const baseSourceHandleId = computed(() =>
   getBaseHandleId(props.sourceHandleId)
 );
 
-// Check if this edge has an error
-const hasError = computed(() => workflowStore.errorEdgeIds.has(props.id));
+// Check if this edge has a validation error
+const hasValidationError = computed(() =>
+  workflowStore.errorEdgeIds.has(props.id)
+);
 
 // Check if this edge is connected to a target node
 const isConnected = computed(() => {
@@ -52,28 +57,52 @@ const isConnected = computed(() => {
 
 // Get the end position of the edge path for the plus button
 const edgeEndPosition = computed(() => {
-  // path[3] and path[4] are the target x,y coordinates
   return {
     x: props.targetX,
     y: props.targetY,
   };
 });
 
-// Get the edge color based on condition type
-const edgeColor = computed(() => {
-  if (hasError.value) return "#ef4444"; // Red for errors
+// ============ EXECUTION STATE ============
 
-  const condition = props.data?.condition || baseSourceHandleId.value;
-  switch (condition) {
-    case "true":
-    case "success":
-      return "#22c55e"; // Green
-    case "false":
-    case "error":
-      return "#ef4444"; // Red
-    default:
-      return "#3b82f6"; // Default blue (matching source handle color)
+// Get the source node's execution status
+const sourceNodeStatus = computed(() => {
+  return executionStore.getNodeStatus(props.source);
+});
+
+// Check if the source node is currently running
+const isSourceRunning = computed(() => sourceNodeStatus.value === "running");
+
+// Check if the source node has completed successfully
+const isSourceSuccess = computed(() => sourceNodeStatus.value === "success");
+
+// Check if the source node has failed
+const isSourceError = computed(() => sourceNodeStatus.value === "error");
+
+// Check if the source node was skipped
+const isSourceSkipped = computed(() => sourceNodeStatus.value === "skipped");
+
+// Should this edge be animated (when source is running)
+const shouldAnimate = computed(() => isSourceRunning.value);
+
+// ============ EDGE STYLING ============
+
+// Get the edge color based on execution state
+const edgeColor = computed(() => {
+  // Validation error takes priority
+  if (hasValidationError.value) return "#ef4444"; // Red
+
+  // Execution-based coloring
+  if (isSourceSuccess.value) {
+    return "#22c55e"; // Green - source completed successfully
   }
+
+  if (isSourceError.value) {
+    return "#ef4444"; // Red - source failed
+  }
+
+  // Default grey for idle, running, or skipped states
+  return "#9ca3af"; // Grey (gray-400)
 });
 
 // Get the display label for conditional edges
@@ -95,10 +124,25 @@ const edgeLabel = computed(() => {
   }
 });
 
-// Label background color
+// Label background color based on execution state
 const labelBgColor = computed(() => {
-  const condition = props.data?.condition || baseSourceHandleId.value;
-  switch (condition) {
+  const handleId = baseSourceHandleId.value;
+
+  // For conditional branches, show colors based on which path was taken
+  if (isSourceSuccess.value && handleId) {
+    // Check if this is the path that was taken
+    const result = executionStore.getNodeResult(props.source);
+    const branch = (result?.output as { branch?: string })?.branch;
+
+    if (branch === handleId) {
+      return "bg-green-100 text-green-700 border-green-300";
+    } else {
+      return "bg-gray-100 text-gray-500 border-gray-300";
+    }
+  }
+
+  // Default styling based on handle type
+  switch (handleId) {
     case "true":
     case "success":
       return "bg-green-100 text-green-700 border-green-300";
@@ -141,12 +185,15 @@ export default {
 <template>
   <!-- Custom styled edge path -->
   <BaseEdge
-    :path="path[0]"
+    :path="edgePathParams[0]"
     :style="{
       stroke: edgeColor,
-      strokeWidth: hasError ? 3 : 2,
+      strokeWidth: hasValidationError ? 3 : 2,
     }"
-    :class="{ 'animate-pulse': hasError }"
+    :class="[
+      hasValidationError ? 'animate-pulse' : '',
+      shouldAnimate ? 'edge-animated' : '',
+    ]"
     :marker-end="isConnected ? `url(#arrow-${props.id})` : undefined"
   />
 
@@ -178,7 +225,7 @@ export default {
       class="nodrag nopan"
     >
       <span
-        class="px-2 py-0.5 text-[10px] font-semibold rounded-full border shadow-sm"
+        class="px-2 py-0.5 text-[10px] font-semibold rounded-full border shadow-sm transition-colors duration-300"
         :class="labelBgColor"
       >
         {{ edgeLabel }}
@@ -209,3 +256,5 @@ export default {
     </div>
   </EdgeLabelRenderer>
 </template>
+
+<style scoped></style>

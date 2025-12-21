@@ -1,6 +1,7 @@
 import type { InjectionKey, ComputedRef } from "vue";
 import type { Position } from "@vue-flow/core";
-import type { WorkflowNodeData, WorkflowExecutionStatus } from "@/types/workflow";
+import type { WorkflowNodeData } from "@/types/workflow";
+import type { ExecutionStatus } from "@/types/execution";
 
 export interface HandleConfig {
   id: string;
@@ -15,7 +16,7 @@ export interface BaseNodeContext {
   isActive: ComputedRef<boolean>;
   isSelected: ComputedRef<boolean>;
   hasValidationError: ComputedRef<boolean>;
-  executionStatus: ComputedRef<WorkflowExecutionStatus | undefined>;
+  executionStatus: ComputedRef<ExecutionStatus>;
   handleClick: () => void;
 }
 

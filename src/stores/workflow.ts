@@ -21,6 +21,7 @@ import {
 } from "@/lib/graphValidation";
 import { getEdgeStyle } from "@/lib/graphValidation";
 import { validateNodeData, getNodeSchema } from "@/lib/schemas";
+import { useWorkflowHistory } from "@/composables/useWorkflowHistory";
 
 const STORAGE_KEY = "workflow-state";
 
@@ -51,6 +52,36 @@ export const useWorkflowStore = defineStore("workflow", () => {
     errors: [],
     warnings: [],
   });
+
+  // ============ HISTORY (UNDO/REDO) ============
+  const history = useWorkflowHistory();
+
+  const canUndo = computed(() => history.canUndo.value);
+  const canRedo = computed(() => history.canRedo.value);
+
+  function undo() {
+    const snapshot = history.undo(nodes.value, edges.value);
+    if (snapshot) {
+      nodes.value = snapshot.nodes;
+      edges.value = snapshot.edges;
+    }
+  }
+
+  function redo() {
+    const snapshot = history.redo(nodes.value, edges.value);
+    if (snapshot) {
+      nodes.value = snapshot.nodes;
+      edges.value = snapshot.edges;
+    }
+  }
+
+  function recordSnapshot() {
+    history.takeSnapshot(nodes.value, edges.value);
+  }
+
+  function recordSnapshotDebounced() {
+    history.takeSnapshotDebounced(nodes.value, edges.value);
+  }
 
   // ============ GETTERS ============
   const activeNode = computed(
@@ -139,9 +170,11 @@ export const useWorkflowStore = defineStore("workflow", () => {
     const validation = canAddNode(type);
     if (!validation.allowed) {
       console.warn(`Cannot add node: ${validation.reason}`);
-      // You can also emit an event or show a toast notification here
       return null;
     }
+
+    // Record snapshot before change
+    recordSnapshot();
 
     const id = generateNodeId();
     const nodeData = createDefaultNodeData(type);
@@ -163,6 +196,11 @@ export const useWorkflowStore = defineStore("workflow", () => {
    * Remove nodes by their IDs
    */
   function removeNodes(nodeIds: string[]) {
+    if (nodeIds.length === 0) return;
+
+    // Record snapshot before change
+    recordSnapshot();
+
     nodes.value = nodes.value.filter((n) => !nodeIds.includes(n.id));
 
     // Also remove connected edges
@@ -342,6 +380,9 @@ export const useWorkflowStore = defineStore("workflow", () => {
       return existingEdge as WorkflowEdge;
     }
 
+    // Record snapshot before change
+    recordSnapshot();
+
     // Get edge styling for conditional branches
     const edgeStyle = getEdgeStyle(sourceHandle);
 
@@ -371,6 +412,11 @@ export const useWorkflowStore = defineStore("workflow", () => {
    * Remove edges by their IDs
    */
   function removeEdges(edgeIds: string[]) {
+    if (edgeIds.length === 0) return;
+
+    // Record snapshot before change
+    recordSnapshot();
+
     edges.value = edges.value.filter(
       (e: Edge) => !edgeIds.includes(e.id)
     ) as WorkflowEdge[];
@@ -528,11 +574,17 @@ export const useWorkflowStore = defineStore("workflow", () => {
    * Clear workflow
    */
   function clearWorkflow() {
+    // Record snapshot before clearing
+    recordSnapshot();
+
     nodes.value = [];
     edges.value = [];
     activeNodeId.value = null;
     selectedNodeIds.value.clear();
     localStorage.removeItem(STORAGE_KEY);
+
+    // Clear history after clearing workflow
+    history.clearHistory();
   }
 
   // Auto-save and validate when nodes or edges change
@@ -579,6 +631,14 @@ export const useWorkflowStore = defineStore("workflow", () => {
     hasCycle,
     errorNodeIds,
     errorEdgeIds,
+
+    // History (Undo/Redo)
+    canUndo,
+    canRedo,
+    undo,
+    redo,
+    recordSnapshot,
+    recordSnapshotDebounced,
 
     // Validation
     canAddNode,

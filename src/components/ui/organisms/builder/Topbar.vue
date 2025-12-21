@@ -1,18 +1,73 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Panel } from "@vue-flow/core";
+import { Play, Square, RotateCcw, Loader2, Undo2, Redo2 } from "lucide-vue-next";
+import { toast } from "vue-sonner";
 import { useWorkflowStore } from "@/stores/workflow";
+import { useWorkflowExecution } from "@/stores/execution";
 
 const workflowStore = useWorkflowStore();
+const executionStore = useWorkflowExecution();
 
 const canRun = computed(
-  () => workflowStore.hasTrigger && workflowStore.isWorkflowValid
+  () => workflowStore.hasTrigger && workflowStore.nodes.length > 0 && !executionStore.isExecuting
 );
 
-function runWorkflow() {
+const isExecuting = computed(() => executionStore.isExecuting);
+
+const executionProgress = computed(() => {
+  const total = workflowStore.nodes.length;
+  const completed = executionStore.executionPathNodes.length;
+  return total > 0 ? Math.round((completed / total) * 100) : 0;
+});
+
+// Undo/Redo
+function handleUndo() {
+  if (workflowStore.canUndo) {
+    workflowStore.undo();
+  }
+}
+
+function handleRedo() {
+  if (workflowStore.canRedo) {
+    workflowStore.redo();
+  }
+}
+
+async function runWorkflow() {
   if (!canRun.value) return;
-  // TODO: Implement execution logic
-  console.log("Running workflow...");
+  
+  try {
+    toast.info("Starting workflow execution...", {
+      description: "Running preview mode",
+    });
+    await executionStore.executeWorkflow();
+    
+    const errors = executionStore.executionErrors;
+    if (errors.length > 0) {
+      toast.error("Workflow completed with errors", {
+        description: `${errors.length} node(s) failed`,
+      });
+    } else {
+      toast.success("Workflow completed successfully!", {
+        description: `Executed ${executionStore.executionPathNodes.length} nodes`,
+      });
+    }
+  } catch (error) {
+    toast.error("Workflow execution failed", {
+      description: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+}
+
+function stopWorkflow() {
+  executionStore.stopExecution();
+  toast.warning("Workflow execution stopped");
+}
+
+function resetWorkflow() {
+  executionStore.resetExecution();
+  toast.info("Execution state reset");
 }
 </script>
 
@@ -38,78 +93,73 @@ function runWorkflow() {
         <span>nodes</span>
       </div>
 
+      <!-- Execution progress (when running) -->
+      <div
+        v-if="isExecuting"
+        class="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-lg"
+      >
+        <Loader2 class="w-3 h-3 text-blue-600 animate-spin" />
+        <span class="text-xs font-medium text-blue-700">
+          Running... {{ executionProgress }}%
+        </span>
+      </div>
+
       <!-- Spacer -->
       <div class="flex-1" />
 
       <!-- Actions -->
       <div class="flex items-center gap-2">
+        <!-- Reset button -->
+        <button
+          v-if="executionStore.executionPathNodes.length > 0 && !isExecuting"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          title="Reset execution state"
+          @click="resetWorkflow"
+        >
+          <RotateCcw class="w-3.5 h-3.5" />
+          Reset
+        </button>
+
         <!-- Undo/Redo -->
         <div
           class="flex items-center border border-gray-200 rounded-lg overflow-hidden"
         >
           <button
-            class="p-1.5 hover:bg-gray-100 transition-colors disabled:opacity-40"
-            title="Undo"
+            class="p-1.5 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="!workflowStore.canUndo"
+            title="Undo (Cmd+Z)"
+            @click="handleUndo"
           >
-            <svg
-              class="w-4 h-4 text-gray-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-              />
-            </svg>
+            <Undo2 class="w-4 h-4 text-gray-600" />
           </button>
           <button
-            class="p-1.5 hover:bg-gray-100 transition-colors border-l border-gray-200 disabled:opacity-40"
-            title="Redo"
+            class="p-1.5 hover:bg-gray-100 transition-colors border-l border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="!workflowStore.canRedo"
+            title="Redo (Cmd+Shift+Z)"
+            @click="handleRedo"
           >
-            <svg
-              class="w-4 h-4 text-gray-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"
-              />
-            </svg>
+            <Redo2 class="w-4 h-4 text-gray-600" />
           </button>
         </div>
 
+        <!-- Stop button (when running) -->
+        <button
+          v-if="isExecuting"
+          class="flex items-center gap-2 px-4 py-1.5 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-all shadow-sm hover:shadow"
+          @click="stopWorkflow"
+        >
+          <Square class="w-4 h-4" />
+          Stop
+        </button>
+
         <!-- Run button -->
         <button
+          v-else
           class="flex items-center gap-2 px-4 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-lg transition-all shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="!canRun"
           @click="runWorkflow"
         >
-          <svg
-            class="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-            />
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
+          <Play class="w-4 h-4" />
           Run Preview
         </button>
       </div>

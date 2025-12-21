@@ -268,42 +268,28 @@ function onPaneClick() {
 @import "@vue-flow/core/dist/theme-default.css";
 @import "@vue-flow/minimap/dist/style.css";
 
-/* Custom edge styling */
-.vue-flow__edge-path {
-  stroke: #3b82f6;
-  stroke-width: 2;
+/* Custom edge styling - default grey */
+/* .vue-flow__edge-path {
+  stroke: #9ca3af;
+  stroke-width: 2;s
 }
 
 .vue-flow__edge.selected .vue-flow__edge-path {
-  stroke: #2563eb;
+  stroke: #6b7280;
   stroke-width: 3;
-}
+} */
 
-.vue-flow__edge.animated .vue-flow__edge-path {
-  stroke-dasharray: 5;
-  animation: dashdraw 0.5s linear infinite;
-}
-
-@keyframes dashdraw {
-  from {
-    stroke-dashoffset: 10;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-/* Connection line styling */
-.vue-flow__connection-line path {
-  stroke: #3b82f6;
+/* Connection line styling - grey while connecting */
+/* .vue-flow__connection-line path {
+  stroke: #9ca3af;
   stroke-width: 2;
   stroke-dasharray: 5, 5;
-}
+} */
 
 /* Selection box */
 .vue-flow__selection {
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px dashed #3b82f6;
+  background: rgba(156, 163, 175, 0.1);
+  border: 1px dashed #9ca3af;
 }
 
 /* Handle hover effects */
