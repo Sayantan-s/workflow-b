@@ -28,17 +28,17 @@ const hasValidationError = computed(() =>
 // Get execution status from the execution store
 const executionStatus = computed(() => executionStore.getNodeStatus(props.id));
 
-// Execution-based styling
+// Execution-based styling (uses border, not ring)
 const executionClass = computed(() => {
   switch (executionStatus.value) {
     case "running":
-      return "ring-2 ring-blue-400 animate-pulse";
+      return "border-blue-400 border animate-pulse";
     case "success":
-      return "ring-2 ring-green-400";
+      return "border-green-400 border";
     case "error":
-      return "ring-2 ring-red-400";
+      return "border-red-400 border";
     case "skipped":
-      return "ring-2 ring-gray-300 opacity-60";
+      return "border-gray-300 border opacity-60";
     default:
       return "";
   }
@@ -65,17 +65,16 @@ provide(BASE_NODE_INJECTION_KEY, context);
 
 <template>
   <div
-    class="base-node group relative min-w-[250px] rounded-lg bg-white shadow-xs border shadow-gray-950/5 transition-all duration-200 cursor-pointer"
+    class="base-node group relative min-w-[250px] rounded-lg bg-white shadow-xs shadow-gray-950/5 transition-all duration-200 cursor-pointer"
     :class="[
       executionClass,
       hasValidationError
-        ? 'border-red-500 ring-2 ring-red-200 animate-pulse'
+        ? 'border-red-500 border animate-pulse'
+        : isSelected
+        ? 'border-indigo-500 border'
         : isActive
-        ? 'border-indigo-300'
-        : 'border-gray-200',
-      isSelected && !hasValidationError && executionStatus === 'idle'
-        ? 'ring-2 ring-indigo-300'
-        : '',
+        ? 'border-indigo-400 border'
+        : 'border border-gray-200',
     ]"
     @click="handleClick"
   >

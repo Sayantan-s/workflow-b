@@ -6,6 +6,7 @@ import { Background } from "@vue-flow/background";
 import { MiniMap } from "@vue-flow/minimap";
 import { toast } from "vue-sonner";
 import { useWorkflowStore } from "@/stores/workflow";
+import { useNodeNavigation } from "@/composables/useNodeNavigation";
 import type { NodeType } from "@/types/workflow";
 
 // Import custom node and edge components
@@ -22,6 +23,9 @@ import {
 import WorkFlowEdge from "./WorkFlowEdge.vue";
 
 const workflowStore = useWorkflowStore();
+
+// Initialize keyboard navigation for connected nodes
+useNodeNavigation();
 
 const { onConnect, onNodesChange, onEdgesChange, project, vueFlowRef } =
   useVueFlow();
