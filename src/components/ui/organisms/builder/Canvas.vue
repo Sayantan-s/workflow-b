@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch } from "vue";
+import { watch, onMounted, onUnmounted } from "vue";
 import { VueFlow, useVueFlow, ConnectionMode } from "@vue-flow/core";
 import type { Connection, ValidConnectionFunc } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
@@ -59,6 +59,7 @@ const {
   onNodesInitialized,
   updateNode,
   getNodes,
+  addSelectedNodes,
 } = useVueFlow();
 
 /**
@@ -272,6 +273,47 @@ function onPaneClick() {
   workflowStore.setActiveNode(null);
   workflowStore.clearSelection();
 }
+
+/**
+ * Handle keyboard shortcut for selecting all nodes (Cmd+A / Ctrl+A)
+ */
+function handleSelectAll(e: KeyboardEvent) {
+  // Check if Cmd+A (Mac) or Ctrl+A (Windows/Linux)
+  const isSelectAll = (e.metaKey || e.ctrlKey) && e.key === "a";
+
+  if (!isSelectAll) return;
+
+  // Skip if user is typing in an input field, textarea, or contenteditable element
+  const target = e.target as HTMLElement;
+  if (
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.isContentEditable
+  ) {
+    return;
+  }
+
+  // Prevent default browser select all behavior
+  e.preventDefault();
+
+  // Select all nodes in the store
+  workflowStore.selectAll();
+
+  // Also update VueFlow's selection state by getting actual node objects
+  const allNodes = getNodes.value;
+  if (allNodes.length > 0) {
+    addSelectedNodes(allNodes);
+  }
+}
+
+// Setup keyboard event listener for select all
+onMounted(() => {
+  window.addEventListener("keydown", handleSelectAll);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("keydown", handleSelectAll);
+});
 </script>
 
 <template>

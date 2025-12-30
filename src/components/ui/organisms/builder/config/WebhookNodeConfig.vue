@@ -58,6 +58,11 @@ watch(
   { immediate: true }
 );
 
+// Handle webhook URL updates from VariableInput
+function handleWebhookUrlUpdate(newUrl: string) {
+  webhookUrl.value = newUrl;
+}
+
 // Auto-save on field changes
 watch([webhookUrl, method], ([newUrl, newMethod]) => {
   const hasNoErrors = Object.keys(errors.value).length === 0;
@@ -76,15 +81,17 @@ watch([webhookUrl, method], ([newUrl, newMethod]) => {
       <label class="text-xs font-medium text-gray-600">
         Webhook URL <span class="text-red-500">*</span>
       </label>
-      <Input
-        v-model="webhookUrl"
+      <VariableInput
+        :model-value="webhookUrl"
+        :node-id="props.nodeId"
         size="sm"
-        type="url"
+        type="text"
         placeholder="https://your-domain.com/webhook"
         :error="errors.webhookUrl"
+        @update:model-value="handleWebhookUrlUpdate"
       />
       <p v-if="!errors.webhookUrl" class="text-[10px] text-gray-400">
-        This URL will receive incoming webhook requests
+        Type &#123;&#123; to see available variables
       </p>
     </div>
 
@@ -109,6 +116,7 @@ watch([webhookUrl, method], ([newUrl, newMethod]) => {
       </label>
       <KeyValueInput
         v-model="headers"
+        :node-id="props.nodeId"
         key-placeholder="Header name"
         value-placeholder="Expected value"
       />

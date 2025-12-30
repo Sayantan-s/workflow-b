@@ -12,7 +12,9 @@ import {
   type IfElseLogicData,
   type DelayLogicData,
   type ManualTriggerData,
+  type TransformLogicData,
 } from "@/types/workflow";
+import TransformNodeConfig from "./config/TransformNodeConfig.vue";
 
 const workflowStore = useWorkflowStore();
 
@@ -50,178 +52,54 @@ const delayData = computed(() =>
     ? (activeNode.value.data as DelayLogicData)
     : null
 );
-const manualTriggerData = computed(() =>
-  activeNode?.value?.data?.type === WorkflowNodeType.TRIGGER_MANUAL
-    ? (activeNode.value.data as ManualTriggerData)
+const transformData = computed(() =>
+  activeNode?.value?.data?.type === WorkflowNodeType.LOGIC_TRANSFORM
+    ? (activeNode.value.data as TransformLogicData)
     : null
 );
 
-// Get node definition for icon and color
-const nodeDefinition = computed(() => {
+const activeNodeDefinition = computed(() => {
   if (!activeNode.value) return null;
-  return NODE_DEFINITIONS.find((n) => n.type === activeNode.value?.data?.type);
+  return NODE_DEFINITIONS.find((n) => n.type === activeNode.value?.data.type);
 });
-
-// Local form state (synced with store)
-const formData = ref<Record<string, unknown>>({});
-
-watch(
-  activeNode,
-  (node) => {
-    if (node) {
-      formData.value = { ...node.data };
-    } else {
-      formData.value = {};
-    }
-  },
-  { immediate: true, deep: true }
-);
-
-function updateField(field: string, value: unknown) {
-  if (!activeNode.value) return;
-  formData.value[field] = value;
-  workflowStore.updateNodeData(activeNode.value.id, { [field]: value });
-}
-
-function getInputValue(event: Event): string {
-  return (event.target as HTMLInputElement).value;
-}
-
-function getTextAreaValue(event: Event): string {
-  return (event.target as HTMLTextAreaElement).value;
-}
 
 function closePanel() {
   workflowStore.setActiveNode(null);
-}
-
-function deleteNode() {
-  if (!activeNode.value) return;
-  workflowStore.removeNodes([activeNode.value.id]);
 }
 </script>
 
 <template>
   <Panel position="top-right" class="m-0! z-20!">
     <Transition
-      enter-active-class="transition-transform duration-200 ease-out"
-      enter-from-class="translate-x-full"
-      enter-to-class="translate-x-0"
-      leave-active-class="transition-transform duration-150 ease-in"
-      leave-from-class="translate-x-0"
-      leave-to-class="translate-x-full"
+      enter-active-class="transition-all duration-300 ease-out"
+      enter-from-class="translate-x-full opacity-0"
+      enter-to-class="translate-x-0 opacity-100"
+      leave-active-class="transition-all duration-200 ease-in"
+      leave-from-class="translate-x-0 opacity-100"
+      leave-to-class="translate-x-full opacity-0"
     >
-      <aside
+      <div
         v-if="isOpen && activeNode"
-        class="w-80 h-screen bg-white/95 backdrop-blur-sm border-l border-gray-200 overflow-y-auto shadow-xl"
+        class="w-80 h-[calc(100vh-2rem)] m-4 bg-white rounded-xl shadow-xs border border-gray-200 flex flex-col overflow-hidden"
       >
         <!-- Header -->
         <div
-          class="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 z-10"
-          :style="{
-            borderTopColor: nodeDefinition?.color,
-            borderTopWidth: '3px',
-          }"
+          class="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50"
         >
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="text-xl">{{ nodeDefinition?.icon }}</span>
-              <div>
-                <h2 class="text-sm font-bold text-gray-800">Configure Node</h2>
-                <p class="text-xs text-gray-500">{{ nodeDefinition?.label }}</p>
-              </div>
-            </div>
-            <button
-              class="p-1.5 hover:bg-gray-100 rounded-md transition-colors"
-              @click="closePanel"
-            >
-              <svg
-                class="w-4 h-4 text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Form Content -->
-        <div class="p-4 space-y-4">
-          <!-- Label -->
-          <div class="space-y-1.5">
-            <label class="text-xs font-medium text-gray-600">Label</label>
-            <input
-              :value="activeNode?.data?.label"
-              type="text"
-              class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow"
-              placeholder="Node label"
-              @input="updateField('label', getInputValue($event))"
-            />
-          </div>
-
-          <!-- Description -->
-          <div class="space-y-1.5">
-            <label class="text-xs font-medium text-gray-600">Description</label>
-            <textarea
-              :value="activeNode?.data?.description || ''"
-              rows="2"
-              class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow resize-none"
-              placeholder="Optional description"
-              @input="updateField('description', getTextAreaValue($event))"
-            />
-          </div>
-
-          <hr class="border-gray-100" />
-
-          <!-- Type-specific fields -->
-          <template v-if="webhookData && activeNode">
-            <WebhookNodeConfig :node-id="activeNode.id" :data="webhookData" />
-          </template>
-
-          <template v-else-if="httpData && activeNode">
-            <HttpNodeConfig :node-id="activeNode.id" :data="httpData" />
-          </template>
-
-          <template v-else-if="emailData && activeNode">
-            <EmailNodeConfig :node-id="activeNode.id" :data="emailData" />
-          </template>
-
-          <template v-else-if="smsData && activeNode">
-            <SmsNodeConfig :node-id="activeNode.id" :data="smsData" />
-          </template>
-
-          <template v-else-if="delayData && activeNode">
-            <DelayNodeConfig :node-id="activeNode.id" :data="delayData" />
-          </template>
-
-          <template v-else-if="manualTriggerData">
-            <div class="p-4 bg-green-50 rounded-lg border border-green-200">
-              <p class="text-xs text-green-700">
-                This trigger starts the workflow manually when you click the Run
-                button.
+          <div class="flex items-center gap-2">
+            <span class="text-lg">{{ activeNodeDefinition?.icon }}</span>
+            <div>
+              <h3 class="text-sm font-semibold text-gray-800">
+                {{ activeNodeDefinition?.label }}
+              </h3>
+              <p class="text-[10px] text-gray-500">
+                ID: {{ activeNode.id.slice(0, 8) }}
               </p>
             </div>
-          </template>
-
-          <template v-else-if="ifElseData && activeNode">
-            <IfElseNodeConfig :node-id="activeNode.id" :data="ifElseData" />
-          </template>
-        </div>
-
-        <!-- Footer Actions -->
-        <div
-          class="sticky bottom-0 bg-white border-t border-gray-100 px-4 py-3"
-        >
+          </div>
           <button
-            class="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-2"
-            @click="deleteNode"
+            class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            @click="closePanel"
           >
             <svg
               class="w-4 h-4"
@@ -233,28 +111,135 @@ function deleteNode() {
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 stroke-width="2"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                d="M6 18L18 6M6 6l12 12"
               />
             </svg>
-            Delete Node
           </button>
         </div>
-      </aside>
+
+        <!-- Configuration Content -->
+        <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
+          <!-- Common Node Settings -->
+          <div class="mb-6 space-y-3">
+            <div>
+              <label class="text-xs font-medium text-gray-600">Label</label>
+              <Input
+                :model-value="activeNode.data.label"
+                size="sm"
+                class="mt-1"
+                @update:model-value="
+                  workflowStore.updateNodeData(activeNode.id, { label: $event })
+                "
+              />
+            </div>
+            <div>
+              <label class="text-xs font-medium text-gray-600"
+                >Description</label
+              >
+              <textarea
+                :value="activeNode.data.description"
+                class="mt-1 w-full text-xs px-2 py-1.5 rounded-md border border-gray-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-none bg-white text-gray-700 placeholder:text-gray-400"
+                rows="2"
+                placeholder="Optional description"
+                @input="
+                  workflowStore.updateNodeData(activeNode.id, {
+                    description: ($event.target as HTMLTextAreaElement).value,
+                  })
+                "
+              />
+            </div>
+          </div>
+
+          <div class="h-px bg-gray-100 my-4" />
+
+          <!-- Specific Node Config -->
+          <div>
+            <WebhookNodeConfig
+              v-if="webhookData"
+              :node-id="activeNode.id"
+              :data="webhookData"
+            />
+            <HttpNodeConfig
+              v-if="httpData"
+              :node-id="activeNode.id"
+              :data="httpData"
+            />
+            <EmailNodeConfig
+              v-if="emailData"
+              :node-id="activeNode.id"
+              :data="emailData"
+            />
+            <SmsNodeConfig
+              v-if="smsData"
+              :node-id="activeNode.id"
+              :data="smsData"
+            />
+            <IfElseNodeConfig
+              v-if="ifElseData"
+              :node-id="activeNode.id"
+              :data="ifElseData"
+            />
+            <DelayNodeConfig
+              v-if="delayData"
+              :node-id="activeNode.id"
+              :data="delayData"
+            />
+            <TransformNodeConfig
+              v-if="transformData"
+              :node-id="activeNode.id"
+              :data="transformData"
+            />
+
+            <div
+              v-if="activeNode.data.type === WorkflowNodeType.TRIGGER_MANUAL"
+              class="text-xs text-gray-500 text-center py-4 bg-gray-50 rounded-lg border border-dashed border-gray-200"
+            >
+              No additional configuration needed.
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-4 py-3 border-t border-gray-100 bg-gray-50/50">
+          <div class="flex items-center justify-between text-xs">
+            <span
+              class="flex items-center gap-1.5"
+              :class="
+                activeNode.data.isValid ? 'text-green-600' : 'text-amber-600'
+              "
+            >
+              <div
+                class="w-1.5 h-1.5 rounded-full"
+                :class="
+                  activeNode.data.isValid ? 'bg-green-500' : 'bg-amber-500'
+                "
+              />
+              {{ activeNode.data.isValid ? "Ready" : "Incomplete" }}
+            </span>
+            <button
+              class="text-red-500 hover:text-red-600 font-medium"
+              @click="workflowStore.removeNodes([activeNode.id])"
+            >
+              Delete Node
+            </button>
+          </div>
+        </div>
+      </div>
     </Transition>
   </Panel>
 </template>
 
 <style scoped>
-aside {
+.custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #d1d5db transparent;
 }
 
-aside::-webkit-scrollbar {
+.custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
 
-aside::-webkit-scrollbar-thumb {
+.custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: #d1d5db;
   border-radius: 3px;
 }

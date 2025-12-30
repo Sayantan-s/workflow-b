@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { NodeProps } from "@vue-flow/core";
 import type { WebhookTriggerData } from "@/types/workflow";
-import { Webhook } from "lucide-vue-next";
 import {
   BaseNode,
   BaseNodeHeader,
@@ -9,6 +8,16 @@ import {
   BaseNodeHandle,
 } from "./base";
 import { computed } from "vue";
+import { Position } from "@vue-flow/core";
+import {
+  getNodeIcon,
+  getNodeColor,
+  getNodeLabel,
+  getNodeSubtext,
+  getNodeIconBgColor,
+  getNodeIconBorderColor,
+  getNodeIconTextColor,
+} from "@/lib/nodeIcons";
 
 interface Props extends NodeProps {
   data: WebhookTriggerData;
@@ -16,28 +25,29 @@ interface Props extends NodeProps {
 
 const props = defineProps<Props>();
 
-const label = computed(() => props.data.label || "Webhook");
+const label = computed(() => props.data.label || getNodeLabel(props.data.type));
+const icon = computed(() => getNodeIcon(props.data.type));
+const nodeColor = computed(() => getNodeColor(props.data.type));
+const subtext = computed(() => getNodeSubtext(props.data.type));
+const iconBgColor = computed(() => getNodeIconBgColor(props.data.type));
+const iconBorderColor = computed(() => getNodeIconBorderColor(props.data.type));
+const iconTextColor = computed(() => getNodeIconTextColor(props.data.type));
 </script>
 
 <template>
-  <BaseNode v-bind="$props" color="#22c55e">
+  <BaseNode v-bind="$props" :color="nodeColor">
     <!-- Target handle (webhook can receive from other nodes) -->
     <BaseNodeHandle type="target" />
 
     <!-- Header with icon -->
-    <BaseNodeHeader>
-      <template #icon>
-        <div class="bg-green-100 border border-green-700/20 p-1.5 rounded-full">
-          <Webhook class="text-green-700 fill-green-100 size-4" />
-        </div>
-      </template>
-      <div>
-        <div class="text-green-900 text-xs font-medium">{{ label }}</div>
-        <p class="text-xs! text-green-800/50 font-normal">
-          Triggers on HTTP webhook
-        </p>
-      </div>
-    </BaseNodeHeader>
+    <BaseNodeHeader
+      :icon="icon"
+      :label="label"
+      :subtext="subtext"
+      :icon-bg-color="iconBgColor"
+      :icon-border-color="iconBorderColor"
+      :icon-text-color="iconTextColor"
+    />
 
     <!-- Content -->
     <BaseNodeContent>
@@ -68,7 +78,13 @@ const label = computed(() => props.data.label || "Webhook");
       </div>
     </BaseNodeContent>
 
-    <!-- Output handle -->
-    <BaseNodeHandle type="source" />
+    <!-- Two source handles: success and error -->
+    <BaseNodeHandle
+      type="source"
+      :handles="[
+        { id: 'success', label: 'Success', position: Position.Right },
+        { id: 'error', label: 'Error', position: Position.Right },
+      ]"
+    />
   </BaseNode>
 </template>

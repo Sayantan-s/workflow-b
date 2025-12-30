@@ -98,12 +98,6 @@ export interface DelayExecutorInput {
   delayUnit: "seconds" | "minutes" | "hours" | "days";
 }
 
-export interface TransformExecutorInput {
-  mappings: Array<{
-    sourcePath: string;
-    variableName: string;
-    defaultValue?: string;
-  }>;
-  sourceData: unknown;
-}
+// TransformExecutorInput is now defined in transformExecutor.ts
+// to match the VariableMapping type from workflow.ts
 

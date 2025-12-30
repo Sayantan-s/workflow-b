@@ -15,6 +15,15 @@ export const WorkflowNodeType = {
 export type WorkflowNodeType =
   (typeof WorkflowNodeType)[keyof typeof WorkflowNodeType];
 
+export const WorkflowNodeCategory = {
+  TRIGGER: "trigger",
+  ACTION: "action",
+  LOGIC: "logic",
+} as const;
+
+export type WorkflowNodeCategory =
+  (typeof WorkflowNodeCategory)[keyof typeof WorkflowNodeCategory];
+
 // ============ EXECUTION STATUS ============
 export const WorkflowExecutionStatus = {
   IDLE: "idle",
@@ -104,7 +113,13 @@ export interface SmsActionData extends BaseNodeData {
 }
 
 // ============ LOGIC NODES ============
-export type ConditionOperator = "equals" | "notEquals" | "contains" | "gt" | "lt" | "isEmpty";
+export type ConditionOperator =
+  | "equals"
+  | "notEquals"
+  | "contains"
+  | "gt"
+  | "lt"
+  | "isEmpty";
 export type ConditionValueType = "string" | "number" | "boolean";
 
 export interface Condition {
@@ -131,9 +146,9 @@ export interface DelayLogicData extends BaseNodeData {
 // ============ TRANSFORM/MAPPER NODE ============
 export interface VariableMapping {
   id: string;
-  sourcePath: string; // JSONPath expression (e.g., "$.response.data.userId")
   variableName: string; // Variable name to store the value (e.g., "userId")
-  defaultValue?: string; // Fallback value if path doesn't exist
+  type: "static" | "path"; // Source type: static value or JSONPath
+  value: string; // The value or path expression
 }
 
 export interface TransformLogicData extends BaseNodeData {

@@ -32,9 +32,9 @@ const nodesByCategory = computed(() => {
 });
 
 const categoryLabels: Record<NodeCategory, string> = {
-  trigger: "🎯 Triggers",
-  action: "⚡ Actions",
-  logic: "🧠 Logic",
+  trigger: "Triggers",
+  action: "Actions",
+  logic: "Logic",
 };
 
 // Check if a node type is disabled due to constraints
@@ -125,93 +125,19 @@ function openPaletteDrawer() {
 
         <!-- Categories -->
         <div class="p-3 space-y-4">
-          <div
+          <PaletteCategory
             v-for="(nodes, category) in nodesByCategory"
             :key="category"
-            class="space-y-2"
-          >
-            <!-- Category Header -->
-            <h3
-              class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1"
-            >
-              {{ categoryLabels[category] }}
-            </h3>
-
-            <!-- Node Items -->
-            <div class="space-y-1.5">
-              <div
-                v-for="node in nodes"
-                :key="node.type"
-                :draggable="!isNodeDisabled(node.type)"
-                class="group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 border border-transparent"
-                :class="[
-                  isNodeDisabled(node.type)
-                    ? 'bg-gray-100 opacity-50 cursor-not-allowed'
-                    : 'bg-gray-50 hover:bg-gray-100 cursor-grab active:cursor-grabbing hover:border-gray-200 hover:shadow-sm',
-                ]"
-                :style="{
-                  borderLeftColor: node.color,
-                  borderLeftWidth: '3px',
-                }"
-                :title="getDisabledReason(node.type) || node.description"
-                @dragstart="onDragStart($event, node.type)"
-                @dragend="onDragEnd"
-              >
-                <!-- Icon -->
-                <span
-                  class="text-xl transition-transform"
-                  :class="{
-                    'group-hover:scale-110': !isNodeDisabled(node.type),
-                  }"
-                >
-                  {{ node.icon }}
-                </span>
-
-                <!-- Info -->
-                <div class="flex-1 min-w-0">
-                  <div class="text-sm font-medium text-gray-700 truncate">
-                    {{ node.label }}
-                  </div>
-                  <div class="text-xs text-gray-400 truncate">
-                    {{ node.description }}
-                  </div>
-                </div>
-
-                <!-- Constraint indicator -->
-                <div
-                  v-if="isNodeDisabled(node.type)"
-                  class="flex items-center"
-                  :title="getDisabledReason(node.type)"
-                >
-                  <svg
-                    class="w-4 h-4 text-amber-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
-                  </svg>
-                </div>
-
-                <!-- Shortcut hint (only show if not disabled) -->
-                <div
-                  v-else-if="node.shortcut"
-                  class="hidden group-hover:flex items-center gap-0.5 opacity-60"
-                >
-                  <kbd
-                    class="px-1 py-0.5 text-[9px] bg-gray-200 rounded font-mono"
-                  >
-                    {{ node.shortcut.split("+").slice(-1)[0] }}
-                  </kbd>
-                </div>
-              </div>
-            </div>
-          </div>
+            :category="category"
+            :label="categoryLabels[category]"
+            :nodes="nodes"
+            :is-node-disabled="isNodeDisabled"
+            :get-disabled-reason="getDisabledReason"
+            :show-shortcut="true"
+            cursor-style="grab"
+            @node-drag-start="onDragStart"
+            @node-drag-end="onDragEnd"
+          />
         </div>
 
         <!-- Footer with workflow info -->

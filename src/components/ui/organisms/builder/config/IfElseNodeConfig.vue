@@ -232,11 +232,12 @@ watch(
             >
               Field Name
             </label>
-            <Input
+            <VariableInput
               :model-value="condition.field"
+              :node-id="props.nodeId"
               size="sm"
               type="text"
-              placeholder="e.g., response.status"
+              placeholder="e.g., response.status or {{ variableName }}"
               :error="conditionErrors[index]?.field"
               @update:model-value="updateCondition(index, 'field', $event)"
             />
@@ -281,11 +282,12 @@ watch(
             >
               Value
             </label>
-            <Input
+            <VariableInput
               :model-value="condition.value"
+              :node-id="props.nodeId"
               size="sm"
-              :type="condition.valueType === 'number' ? 'number' : 'text'"
-              placeholder="Value to compare"
+              type="text"
+              placeholder="Value to compare or {{ variableName }}"
               :error="conditionErrors[index]?.value"
               @update:model-value="updateCondition(index, 'value', $event)"
             />

@@ -91,19 +91,40 @@ function getHandleClass(baseId?: string): string {
   switch (baseId) {
     case "true":
     case "success":
-      return "bg-green-500!";
+      return "bg-emerald-500!";
     case "false":
     case "error":
-      return "bg-red-500!";
+      return "bg-rose-500!";
     default:
       return "bg-blue-500!";
   }
 }
 
 // Position calculation for multiple handles
-function getHandlePosition(index: number, total: number): string {
+// Vue Flow automatically positions handles on the correct edge based on the `position` prop
+// We need to offset them along that edge using percentage-based positioning
+function getHandlePosition(
+  index: number,
+  total: number,
+  position: Position
+): Record<string, string> {
   const step = 100 / (total + 1);
-  return `${step * (index + 1)}%`;
+  const percentage = `${step * (index + 1)}%`;
+
+  // For right/left positioned handles, use top percentage for vertical distribution
+  // Vue Flow will position them on the right/left edge, we just offset vertically
+  if (position === Position.Right || position === Position.Left) {
+    return {
+      top: percentage,
+    };
+  }
+  // For top/bottom positioned handles, use left percentage for horizontal distribution
+  if (position === Position.Top || position === Position.Bottom) {
+    return {
+      left: percentage,
+    };
+  }
+  return {};
 }
 </script>
 
@@ -125,13 +146,17 @@ function getHandlePosition(index: number, total: number): string {
       :key="handle.id"
       :type="type"
       :id="getHandleId(handle.id)"
-      :position="handle.position || Position.Bottom"
+      :position="handle.position || defaultPosition"
       :is-valid-connection="isValidConnection"
       class="w-3! h-3! border-2! border-white!"
       :class="getHandleClass(handle.id)"
-      :style="{
-        left: getHandlePosition(index, handles.length),
-      }"
+      :style="
+        getHandlePosition(
+          index,
+          handles.length,
+          handle.position || defaultPosition
+        )
+      "
     />
   </template>
 </template>

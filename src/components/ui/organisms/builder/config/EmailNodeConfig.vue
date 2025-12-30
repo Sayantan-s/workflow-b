@@ -65,6 +65,16 @@ watch(
   { immediate: true }
 );
 
+// Handle subject updates from VariableInput
+function handleSubjectUpdate(newSubject: string) {
+  subject.value = newSubject;
+}
+
+// Handle body updates from VariableInput
+function handleBodyUpdate(newBody: string) {
+  body.value = newBody;
+}
+
 // Auto-save on field changes
 watch(
   [toRecipients, ccRecipients, bccRecipients, subject, body],
@@ -139,28 +149,37 @@ watch(
       <label class="text-xs font-medium text-gray-600">
         Subject <span class="text-red-500">*</span>
       </label>
-      <Input
-        v-model="subject"
+      <VariableInput
+        :model-value="subject"
+        :node-id="props.nodeId"
         size="sm"
+        type="text"
         placeholder="Email subject line"
         :error="errors.subject"
+        @update:model-value="handleSubjectUpdate"
       />
       <p v-if="!errors.subject" class="text-[10px] text-gray-400">
-        Use &#123;&#123;variable&#125;&#125; for dynamic values
+        Type &#123;&#123; to see available variables
       </p>
     </div>
 
-    <!-- Body (Rich Text Editor) -->
+    <!-- Body -->
     <div class="space-y-1.5">
       <label class="text-xs font-medium text-gray-600">
         Body <span class="text-red-500">*</span>
       </label>
-      <Rte
-        v-model="body"
-        placeholder="Compose your email..."
-        height="180px"
+      <VariableInput
+        :model-value="body"
+        :node-id="props.nodeId"
+        size="sm"
+        type="textarea"
+        placeholder="Compose your email... Use {{ variableName }} for dynamic values"
         :error="errors.body"
+        @update:model-value="handleBodyUpdate"
       />
+      <p v-if="!errors.body" class="text-[10px] text-gray-400">
+        Type &#123;&#123; to see available variables
+      </p>
     </div>
   </div>
 </template>

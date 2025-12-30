@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Plus, Trash2 } from "lucide-vue-next";
+import VariableInput from "./variable-input.vue";
 
 interface KeyValuePair {
   key: string;
@@ -13,6 +14,7 @@ interface Props {
   valuePlaceholder?: string;
   disabled?: boolean;
   error?: string;
+  nodeId?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -56,19 +58,25 @@ function updatePair(index: number, field: "key" | "value", value: string) {
       :key="index"
       class="flex items-center gap-2"
     >
-      <input
-        :value="pair.key"
+      <VariableInput
+        :model-value="pair.key"
+        :node-id="nodeId"
+        size="sm"
+        type="text"
         :placeholder="keyPlaceholder"
         :disabled="disabled"
-        class="flex-1 h-9 px-3 text-sm rounded-lg border border-gray-300 bg-white placeholder:text-gray-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 disabled:opacity-50"
-        @input="updatePair(index, 'key', ($event.target as HTMLInputElement).value)"
+        class="flex-1"
+        @update:model-value="updatePair(index, 'key', $event)"
       />
-      <input
-        :value="pair.value"
+      <VariableInput
+        :model-value="pair.value"
+        :node-id="nodeId"
+        size="sm"
+        type="text"
         :placeholder="valuePlaceholder"
         :disabled="disabled"
-        class="flex-1 h-9 px-3 text-sm rounded-lg border border-gray-300 bg-white placeholder:text-gray-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 disabled:opacity-50"
-        @input="updatePair(index, 'value', ($event.target as HTMLInputElement).value)"
+        class="flex-1"
+        @update:model-value="updatePair(index, 'value', $event)"
       />
       <button
         type="button"

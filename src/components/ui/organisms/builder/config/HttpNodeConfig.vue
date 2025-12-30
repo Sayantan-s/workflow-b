@@ -16,8 +16,25 @@ const props = defineProps<Props>();
 const workflowStore = useWorkflowStore();
 
 // Zod validation schema
+// Allow URLs with variables ({{ variableName }}) - will be resolved at runtime
 const httpConfigSchema = z.object({
-  url: z.url("Please enter a valid URL"),
+  url: z
+    .string()
+    .min(1, "URL is required")
+    .refine(
+      (val) => {
+        // If it contains variables, skip URL validation (will be validated after resolution)
+        if (val.includes("{{")) return true;
+        // Otherwise, validate as URL
+        try {
+          new URL(val);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: "Please enter a valid URL" }
+    ),
   method: z.string(),
   timeout: z.number().min(1).max(300),
   headers: z.array(z.object({ key: z.string(), value: z.string() })).optional(),
@@ -36,7 +53,7 @@ const { errors, setValues } = useForm({
 });
 
 // Field bindings
-const { value: url } = useField<string>("url");
+const { value: url, setValue: setUrl } = useField<string>("url");
 const { value: method } = useField<HttpMethod>("method");
 const { value: timeout } = useField<number>("timeout");
 const { value: headers } =
@@ -70,7 +87,12 @@ watch(
 watch(
   [url, method, timeout, body],
   ([newUrl, newMethod, newTimeout, newBody]) => {
-    const hasNoErrors = Object.keys(errors.value).length === 0;
+    // Skip validation for URL if it contains variables (will be resolved at runtime)
+    const urlHasVariables = typeof newUrl === "string" && newUrl.includes("{{");
+    const hasNoErrors =
+      Object.keys(errors.value).length === 0 ||
+      (urlHasVariables && !errors.value.url);
+
     workflowStore.updateNodeData(props.nodeId, {
       url: newUrl,
       method: newMethod,
@@ -78,8 +100,28 @@ watch(
       body: newBody,
       isValid: hasNoErrors && !!newUrl,
     });
-  }
+  },
+  { immediate: false }
 );
+
+// Handle URL updates from VariableInput
+function handleUrlUpdate(newUrl: string) {
+  console.log("[HttpNodeConfig] URL updated:", newUrl);
+  setUrl(newUrl);
+  // Manually trigger save since watch might not catch the change immediately
+  workflowStore.updateNodeData(props.nodeId, {
+    url: newUrl,
+  });
+  console.log(
+    "[HttpNodeConfig] Saved to store. Current node data:",
+    workflowStore.nodes.find((n) => n.id === props.nodeId)?.data
+  );
+}
+
+// Handle body updates from VariableInput
+function handleBodyUpdate(newBody: string) {
+  body.value = newBody;
+}
 </script>
 
 <template>
@@ -89,15 +131,17 @@ watch(
       <label class="text-xs font-medium text-gray-600">
         URL <span class="text-red-500">*</span>
       </label>
-      <Input
-        v-model="url"
+      <VariableInput
+        :model-value="url"
+        :node-id="props.nodeId"
         size="sm"
-        type="url"
-        placeholder="https://api.example.com/endpoint"
+        type="text"
+        placeholder="https://api.example.com/endpoint or https://api.example.com/{{ variableName }}"
         :error="errors.url"
+        @update:model-value="handleUrlUpdate"
       />
       <p v-if="!errors.url" class="text-[10px] text-gray-400">
-        Use &#123;&#123;variable&#125;&#125; for dynamic values
+        Type &#123;&#123; to see available variables
       </p>
     </div>
 
@@ -135,6 +179,7 @@ watch(
       <label class="text-xs font-medium text-gray-600">Headers</label>
       <KeyValueInput
         v-model="headers"
+        :node-id="props.nodeId"
         key-placeholder="Header name"
         value-placeholder="Header value"
       />
@@ -145,12 +190,18 @@ watch(
       <label class="text-xs font-medium text-gray-600">
         Request Body (JSON)
       </label>
-      <Codeditor
-        v-model:value="body"
-        language="json"
-        theme="light"
-        height="150px"
+      <VariableInput
+        :model-value="body"
+        :node-id="props.nodeId"
+        size="sm"
+        type="textarea"
+        placeholder='{"key": "value"} or {"key": "{{ variableName }}"}'
+        :error="errors.body"
+        @update:model-value="handleBodyUpdate"
       />
+      <p v-if="!errors.body" class="text-[10px] text-gray-400">
+        Type &#123;&#123; to see available variables
+      </p>
     </div>
   </div>
 </template>

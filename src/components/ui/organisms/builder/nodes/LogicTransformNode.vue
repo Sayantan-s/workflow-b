@@ -2,13 +2,21 @@
 import { computed } from "vue";
 import type { NodeProps } from "@vue-flow/core";
 import type { TransformLogicData } from "@/types/workflow";
-import { Shuffle } from "lucide-vue-next";
 import {
   BaseNode,
   BaseNodeHeader,
   BaseNodeContent,
   BaseNodeHandle,
 } from "./base";
+import {
+  getNodeIcon,
+  getNodeColor,
+  getNodeLabel,
+  getNodeSubtext,
+  getNodeIconBgColor,
+  getNodeIconBorderColor,
+  getNodeIconTextColor,
+} from "@/lib/nodeIcons";
 
 interface Props extends NodeProps {
   data: TransformLogicData;
@@ -16,19 +24,15 @@ interface Props extends NodeProps {
 
 const props = defineProps<Props>();
 
-const label = computed(() => props.data.label || "Transform");
+const label = computed(() => props.data.label || getNodeLabel(props.data.type));
+const icon = computed(() => getNodeIcon(props.data.type));
+const nodeColor = computed(() => getNodeColor(props.data.type));
+const subtext = computed(() => getNodeSubtext(props.data.type));
+const iconBgColor = computed(() => getNodeIconBgColor(props.data.type));
+const iconBorderColor = computed(() => getNodeIconBorderColor(props.data.type));
+const iconTextColor = computed(() => getNodeIconTextColor(props.data.type));
 
 const mappingCount = computed(() => props.data.mappings?.length ?? 0);
-
-const mappingSummary = computed(() => {
-  const mappings = props.data.mappings || [];
-  if (mappings.length === 0) return "No mappings configured";
-  if (mappings.length === 1) {
-    const m = mappings[0];
-    return `${m.sourcePath} → ${m.variableName}`;
-  }
-  return `${mappings.length} variable mappings`;
-});
 
 // Show first 3 mappings as preview
 const mappingPreview = computed(() => {
@@ -38,24 +42,17 @@ const mappingPreview = computed(() => {
 </script>
 
 <template>
-  <BaseNode v-bind="$props" color="#f59e0b">
+  <BaseNode v-bind="$props" :color="nodeColor">
     <BaseNodeHandle type="target" />
 
-    <BaseNodeHeader>
-      <template #icon>
-        <div
-          class="bg-amber-100 border border-amber-700/20 p-1.5 rounded-full"
-        >
-          <Shuffle class="text-amber-700 size-4" />
-        </div>
-      </template>
-      <div>
-        <div class="text-amber-900 text-xs font-medium">{{ label }}</div>
-        <p class="text-xs! text-amber-800/50 font-normal">
-          Extract & map data
-        </p>
-      </div>
-    </BaseNodeHeader>
+    <BaseNodeHeader
+      :icon="icon"
+      :label="label"
+      :subtext="subtext"
+      :icon-bg-color="iconBgColor"
+      :icon-border-color="iconBorderColor"
+      :icon-text-color="iconTextColor"
+    />
 
     <BaseNodeContent>
       <div class="space-y-2">
@@ -78,10 +75,26 @@ const mappingPreview = computed(() => {
             :key="mapping.id"
             class="flex items-center gap-1 text-[10px]"
           >
-            <code class="text-gray-500 truncate max-w-[60px]">{{
-              mapping.sourcePath
-            }}</code>
-            <span class="text-gray-400">→</span>
+            <!-- Source -->
+            <div class="flex items-center max-w-[80px]">
+              <span
+                v-if="mapping.type === 'static'"
+                class="text-[8px] px-1 bg-gray-100 rounded text-gray-500 mr-1 shrink-0"
+                >V</span
+              >
+              <span
+                v-else
+                class="text-[8px] px-1 bg-blue-50 rounded text-blue-500 mr-1 shrink-0"
+                >P</span
+              >
+              <code class="text-gray-500 truncate block">{{
+                mapping.value
+              }}</code>
+            </div>
+
+            <span class="text-gray-400 shrink-0">→</span>
+
+            <!-- Target -->
             <code class="text-amber-600 font-medium truncate max-w-[60px]">{{
               mapping.variableName
             }}</code>
@@ -95,10 +108,7 @@ const mappingPreview = computed(() => {
         </div>
 
         <!-- Empty state -->
-        <div
-          v-else
-          class="text-[10px] text-gray-400 italic"
-        >
+        <div v-else class="text-[10px] text-gray-400 italic">
           Click to configure mappings
         </div>
       </div>
@@ -107,4 +117,3 @@ const mappingPreview = computed(() => {
     <BaseNodeHandle type="source" />
   </BaseNode>
 </template>
-

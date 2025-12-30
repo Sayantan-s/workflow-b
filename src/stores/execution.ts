@@ -199,12 +199,38 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
 
   /**
    * Resolve template variables in a string
-   * Replaces {{ $node.nodeId.output.path }} with actual values
+   * Supports:
+   * - {{ variableName }} - Variables from Transform nodes
+   * - {{ $node.nodeId.path }} - Direct node output access
    */
   function resolveVariables(template: string): string {
     if (!template) return template;
 
-    return template.replace(
+    let resolved = template;
+
+    // First, resolve {{ variableName }} format (variables from Transform nodes)
+    resolved = resolved.replace(
+      /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g,
+      (match, variableName) => {
+        const variableValue = executionContext.value.variables[variableName];
+        if (variableValue !== undefined && variableValue !== null) {
+          const resolvedValue = String(variableValue);
+          // Debug: log variable resolution
+          console.log(
+            `[Execution] Resolved variable: {{ ${variableName} }} = "${resolvedValue}"`
+          );
+          return resolvedValue;
+        }
+        // Debug: log unresolved variable
+        console.warn(
+          `[Execution] Variable not found: {{ ${variableName} }}. Available: ${Object.keys(executionContext.value.variables).join(", ") || "none"}`
+        );
+        return match; // Return original if variable not found
+      }
+    );
+
+    // Then, resolve {{ $node.nodeId.path }} format (direct node output access)
+    resolved = resolved.replace(
       /\{\{\s*\$node\.(\w+)\.([^}]+)\s*\}\}/g,
       (match, nodeId, path) => {
         const nodeOutput = executionContext.value.nodeResults[nodeId];
@@ -226,6 +252,8 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
         return String(value ?? match);
       }
     );
+
+    return resolved;
   }
 
   /**
@@ -296,25 +324,63 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
             throw new Error("HTTP method is required");
           }
 
-          output = await executeWebhook({
-            url: webhookUrl,
-            method: data.method,
-            timeout: 30,
-            auth: data.auth,
-          });
+          try {
+            const webhookResult = await executeWebhook({
+              url: webhookUrl,
+              method: data.method,
+              timeout: 30,
+              auth: data.auth,
+            });
+            // Success case - return with branch indicator
+            output = {
+              ...webhookResult,
+              branch: "success" as const,
+            };
+            addLog(node.id, "Webhook request succeeded", "success");
+          } catch (error) {
+            // Error case - return error info with branch indicator
+            const errorMessage =
+              error instanceof Error ? error.message : "Unknown error";
+            output = {
+              branch: "error" as const,
+              error: errorMessage,
+              status: 0,
+              statusText: "Error",
+              headers: {},
+              data: null,
+              duration: Date.now() - startTime,
+            };
+            addLog(node.id, `Webhook request failed: ${errorMessage}`, "error");
+          }
           break;
         }
 
         case WorkflowNodeType.ACTION_HTTP: {
           const data = node.data as HttpActionData;
 
-          // Validate required inputs
+          // Resolve variables in URL
           const url = resolveVariables(data.url);
+          
+          // Debug logging
+          if (data.url !== url) {
+            addLog(
+              node.id,
+              `Resolved URL: "${data.url}" → "${url}"`,
+              "info"
+            );
+          } else if (data.url.includes("{{")) {
+            addLog(
+              node.id,
+              `Warning: URL contains unresolved variables: "${data.url}". Available variables: ${Object.keys(executionContext.value.variables).join(", ") || "none"}`,
+              "warning"
+            );
+          }
+
           if (!url || url.trim() === "") {
             throw new Error("HTTP URL is required");
           }
 
-          // Validate URL format
+          // Validate URL format (after resolution)
           try {
             new URL(url);
           } catch {
@@ -335,13 +401,35 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
             }
           }
 
-          output = await executeHttp({
-            url,
-            method: data.method,
-            body: parsedBody,
-            timeout: data.timeout || 30,
-            auth: data.auth,
-          });
+          try {
+            const httpResult = await executeHttp({
+              url,
+              method: data.method,
+              body: parsedBody,
+              timeout: data.timeout || 30,
+              auth: data.auth,
+            });
+            // Success case - return with branch indicator
+            output = {
+              ...httpResult,
+              branch: "success" as const,
+            };
+            addLog(node.id, `HTTP ${data.method} request succeeded (${httpResult.status})`, "success");
+          } catch (error) {
+            // Error case - return error info with branch indicator
+            const errorMessage =
+              error instanceof Error ? error.message : "Unknown error";
+            output = {
+              branch: "error" as const,
+              error: errorMessage,
+              status: 0,
+              statusText: "Error",
+              headers: {},
+              data: null,
+              duration: Date.now() - startTime,
+            };
+            addLog(node.id, `HTTP ${data.method} request failed: ${errorMessage}`, "error");
+          }
           break;
         }
 
@@ -403,6 +491,25 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
 
           // Store variables in context
           Object.assign(executionContext.value.variables, result.variables);
+          
+          // Debug: log stored variables
+          console.log(
+            `[Execution] Transform node stored variables:`,
+            Object.keys(result.variables).map(
+              (key) => `${key} = ${JSON.stringify(result.variables[key])}`
+            )
+          );
+          console.log(
+            `[Execution] All variables in context:`,
+            Object.keys(executionContext.value.variables)
+          );
+          
+          addLog(
+            node.id,
+            `Stored ${Object.keys(result.variables).length} variable(s): ${Object.keys(result.variables).join(", ")}`,
+            "success"
+          );
+          
           output = result;
           break;
         }
@@ -557,10 +664,13 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
         // Execute the current node
         const result = await runNode(currentId);
 
-        // If execution failed, stop (unless it's a branch node)
+        // If execution failed, stop (unless it's a branch node that handles errors)
+        // HTTP/Webhook nodes handle errors via branching, so don't stop on their errors
         if (
           result.status === "error" &&
-          node.data?.type !== WorkflowNodeType.LOGIC_IF_ELSE
+          node.data?.type !== WorkflowNodeType.LOGIC_IF_ELSE &&
+          node.data?.type !== WorkflowNodeType.ACTION_HTTP &&
+          node.data?.type !== WorkflowNodeType.TRIGGER_WEBHOOK
         ) {
           addLog(currentId, "Workflow stopped due to error", "error");
           break;
@@ -586,6 +696,31 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
           skippedNodes.forEach((skippedId) => {
             nodeExecutionStatus.value[skippedId] = "skipped";
             addLog(skippedId, `Skipped (branch: ${otherBranch})`, "warning");
+          });
+        } else if (
+          node.data?.type === WorkflowNodeType.ACTION_HTTP ||
+          node.data?.type === WorkflowNodeType.TRIGGER_WEBHOOK
+        ) {
+          // Special handling for HTTP/Webhook - route based on success/error
+          const httpResult = result.output as { branch?: "success" | "error" };
+          const branch = httpResult?.branch || "success";
+
+          // Find the edge with the matching handle
+          const branchHandle = `source__${branch}`;
+          downstreamNodes = getDownstreamNodes(currentId, branchHandle);
+
+          // Mark the other branch as skipped
+          const otherBranch = branch === "success" ? "error" : "success";
+          const otherHandle = `source__${otherBranch}`;
+          const skippedNodes = getDownstreamNodes(currentId, otherHandle);
+
+          skippedNodes.forEach((skippedId) => {
+            nodeExecutionStatus.value[skippedId] = "skipped";
+            addLog(
+              skippedId,
+              `Skipped (${otherBranch === "error" ? "request succeeded" : "request failed"})`,
+              "warning"
+            );
           });
         } else {
           downstreamNodes = getDownstreamNodes(currentId);

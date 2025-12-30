@@ -1,18 +1,29 @@
-import type { TransformExecutorInput } from "@/types/execution";
+import type { VariableMapping } from "@/types/workflow";
 
 export interface TransformExecutorOutput {
   variables: Record<string, unknown>;
   mappingResults: Array<{
-    sourcePath: string;
     variableName: string;
     value: unknown;
     success: boolean;
+    sourceType: "static" | "path";
   }>;
 }
 
 /**
  * Get a value from an object using JSONPath-like syntax
- * Supports: $.data.user.name, $.items[0], etc.
+ * Supports:
+ * - $.data.user.name
+ * - $.items[0]
+ * - data.user.name
+ * - response.data.id
+ * - response.data.users[0].name (array access)
+ * - data.items[0].value (nested array access)
+ *
+ * Special handling: If path starts with "response." and the data doesn't have
+ * a "response" key, it strips "response." and tries again (for user convenience)
+ *
+ * Array handling: Supports bracket notation like [0], [1] to access array indices
  */
 function getValueByPath(data: unknown, path: string): unknown {
   if (!path) return undefined;
@@ -23,9 +34,25 @@ function getValueByPath(data: unknown, path: string): unknown {
     normalizedPath = normalizedPath.slice(1);
   }
 
-  // Split by dots and brackets
+  // Handle "response." prefix - if data doesn't have "response" key, strip it
+  // This allows users to write "response.data.users[0].name" even when the
+  // data itself is the response object (not wrapped in a "response" key)
+  if (normalizedPath.startsWith("response.")) {
+    // Check if data has a "response" key
+    if (
+      typeof data === "object" &&
+      data !== null &&
+      !("response" in (data as Record<string, unknown>))
+    ) {
+      // Strip "response." prefix since the data itself IS the response
+      normalizedPath = normalizedPath.slice("response.".length);
+    }
+  }
+
+  // Split by dots and brackets - this handles both object properties and array indices
+  // Example: "data.users[0].name" -> ["data", "users", "0", "name"]
   const parts = normalizedPath.split(/\.|\[|\]/).filter(Boolean);
-  
+
   let current: unknown = data;
 
   for (const part of parts) {
@@ -53,9 +80,15 @@ function getValueByPath(data: unknown, path: string): unknown {
   return current;
 }
 
+export interface TransformExecutorInput {
+  mappings: VariableMapping[];
+  sourceData: unknown;
+}
+
 /**
  * Execute transform/mapper node
  * Extracts values from source data and creates variables
+ * Supports both static values and JSONPath extraction
  */
 export async function executeTransform(
   input: TransformExecutorInput
@@ -65,29 +98,60 @@ export async function executeTransform(
 
   for (const mapping of input.mappings) {
     try {
-      const value = getValueByPath(input.sourceData, mapping.sourcePath);
-      
-      // Use default value if path returns undefined
-      const finalValue = value !== undefined ? value : mapping.defaultValue;
+      let finalValue: unknown;
+      let success = true;
+
+      if (mapping.type === "static") {
+        // Static value - use as-is
+        finalValue = mapping.value;
+      } else {
+        // Path-based extraction
+        const extractedValue = getValueByPath(input.sourceData, mapping.value);
+
+        if (extractedValue === undefined) {
+          // Path extraction failed - throw error to stop execution
+          let errorMessage = `Failed to extract path "${mapping.value}" for variable "${mapping.variableName}".`;
+
+          // Add helpful context about available data
+          if (
+            typeof input.sourceData === "object" &&
+            input.sourceData !== null
+          ) {
+            const availableKeys = Object.keys(input.sourceData);
+            if (availableKeys.length > 0) {
+              errorMessage += ` Available keys in source data: ${availableKeys.join(
+                ", "
+              )}.`;
+            } else {
+              errorMessage += " Source data is an empty object.";
+            }
+          } else if (input.sourceData === null) {
+            errorMessage += " Source data is null.";
+          } else if (input.sourceData === undefined) {
+            errorMessage +=
+              " Source data is undefined (upstream node may not have executed successfully).";
+          } else {
+            errorMessage += ` Source data type: ${typeof input.sourceData}.`;
+          }
+
+          throw new Error(errorMessage);
+        } else {
+          finalValue = extractedValue;
+        }
+      }
 
       variables[mapping.variableName] = finalValue;
-      
+
       mappingResults.push({
-        sourcePath: mapping.sourcePath,
         variableName: mapping.variableName,
         value: finalValue,
-        success: true,
+        success,
+        sourceType: mapping.type,
       });
     } catch (error) {
-      // Use default value on error
-      variables[mapping.variableName] = mapping.defaultValue;
-      
-      mappingResults.push({
-        sourcePath: mapping.sourcePath,
-        variableName: mapping.variableName,
-        value: mapping.defaultValue,
-        success: false,
-      });
+      // Re-throw the error to stop execution and show error in UI
+      // This ensures that undefined path extractions break the workflow
+      throw error;
     }
   }
 
@@ -96,4 +160,3 @@ export async function executeTransform(
     mappingResults,
   };
 }
-

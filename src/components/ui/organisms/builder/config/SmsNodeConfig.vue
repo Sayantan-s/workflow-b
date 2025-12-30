@@ -52,6 +52,19 @@ watch(
   { immediate: true }
 );
 
+// Handle field updates from VariableInput
+function handleFromNumberUpdate(newFrom: string) {
+  fromNumber.value = newFrom;
+}
+
+function handleToNumberUpdate(newTo: string) {
+  toNumber.value = newTo;
+}
+
+function handleMessageUpdate(newMessage: string) {
+  message.value = newMessage;
+}
+
 // Auto-save on field changes
 watch(
   [fromNumber, toNumber, message],
@@ -74,13 +87,18 @@ watch(
       <label class="text-xs font-medium text-gray-600">
         From <span class="text-red-500">*</span>
       </label>
-      <Input
-        v-model="fromNumber"
+      <VariableInput
+        :model-value="fromNumber"
+        :node-id="props.nodeId"
         size="sm"
-        type="tel"
-        placeholder="+1234567890"
+        type="text"
+        placeholder="+1234567890 or {{ phoneNumber }}"
         :error="errors.fromNumber"
+        @update:model-value="handleFromNumberUpdate"
       />
+      <p v-if="!errors.fromNumber" class="text-[10px] text-gray-400">
+        Type &#123;&#123; to see available variables
+      </p>
     </div>
 
     <!-- To Number -->
@@ -88,13 +106,18 @@ watch(
       <label class="text-xs font-medium text-gray-600">
         To <span class="text-red-500">*</span>
       </label>
-      <Input
-        v-model="toNumber"
+      <VariableInput
+        :model-value="toNumber"
+        :node-id="props.nodeId"
         size="sm"
-        type="tel"
-        placeholder="+1234567890"
+        type="text"
+        placeholder="+1234567890 or {{ phoneNumber }}"
         :error="errors.toNumber"
+        @update:model-value="handleToNumberUpdate"
       />
+      <p v-if="!errors.toNumber" class="text-[10px] text-gray-400">
+        Type &#123;&#123; to see available variables
+      </p>
     </div>
 
     <!-- Message -->
@@ -105,15 +128,17 @@ watch(
           ({{ message?.length || 0 }}/160)
         </span>
       </label>
-      <Textarea
-        v-model="message"
+      <VariableInput
+        :model-value="message"
+        :node-id="props.nodeId"
         size="sm"
-        :rows="3"
-        placeholder="Enter your SMS message"
+        type="textarea"
+        placeholder="Enter your SMS message. Use {{ variableName }} for dynamic values"
         :error="errors.message"
+        @update:model-value="handleMessageUpdate"
       />
       <p class="text-[10px] text-gray-400">
-        Use &#123;&#123;variable&#125;&#125; for dynamic values
+        Type &#123;&#123; to see available variables
       </p>
     </div>
   </div>
