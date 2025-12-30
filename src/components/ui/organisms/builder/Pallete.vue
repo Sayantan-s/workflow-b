@@ -8,8 +8,10 @@ import {
   type NodeCategory,
 } from "@/types/workflow";
 import { useWorkflowStore } from "@/stores/workflow";
+import { useDragAndDrop } from "@/composables/useDragAndDrop";
 
 const workflowStore = useWorkflowStore();
+const { onDragStart, onDragEnd } = useDragAndDrop();
 
 // Collapsed state
 const isCollapsed = ref(false);
@@ -46,24 +48,6 @@ function getDisabledReason(type: NodeType): string | undefined {
   return validation.reason;
 }
 
-function onDragStart(event: DragEvent, type: NodeType) {
-  // Prevent dragging disabled nodes
-  if (isNodeDisabled(type)) {
-    event.preventDefault();
-    return;
-  }
-
-  if (event.dataTransfer) {
-    event.dataTransfer.setData("application/vueflow", type);
-    event.dataTransfer.effectAllowed = "move";
-  }
-  workflowStore.startDrag(type);
-}
-
-function onDragEnd() {
-  workflowStore.endDrag();
-}
-
 function toggleCollapsed() {
   isCollapsed.value = !isCollapsed.value;
 }
@@ -74,7 +58,7 @@ function openPaletteDrawer() {
 </script>
 
 <template>
-  <Panel position="top-left" class="m-0!">
+  <Panel position="top-left" class="m-0! z-20!">
     <!-- Collapsed state: just a button -->
     <Transition
       enter-active-class="transition-all duration-200 ease-out"

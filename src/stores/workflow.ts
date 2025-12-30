@@ -179,14 +179,20 @@ export const useWorkflowStore = defineStore("workflow", () => {
     const id = generateNodeId();
     const nodeData = createDefaultNodeData(type);
 
+    const vueFlowType = getVueFlowNodeType(type);
+    console.log("[WorkflowStore] Creating node with type:", type, "->", vueFlowType);
+
     const newNode: WorkflowNode = {
       id,
-      type: getVueFlowNodeType(type),
+      type: vueFlowType,
       position,
       data: nodeData,
     };
 
+    console.log("[WorkflowStore] New node:", JSON.stringify(newNode, null, 2));
+
     nodes.value = [...nodes.value, newNode];
+    console.log("[WorkflowStore] Total nodes after add:", nodes.value.length);
     setActiveNode(id);
 
     return newNode;
@@ -559,11 +565,14 @@ export const useWorkflowStore = defineStore("workflow", () => {
    */
   function loadFromStorage() {
     const saved = localStorage.getItem(STORAGE_KEY);
+    console.log("[WorkflowStore] Loading from storage:", saved ? "found" : "empty");
     if (saved) {
       try {
         const state = JSON.parse(saved);
         nodes.value = state.nodes || [];
         edges.value = state.edges || [];
+        console.log("[WorkflowStore] Loaded nodes:", nodes.value.length);
+        console.log("[WorkflowStore] Node types:", nodes.value.map((n: WorkflowNode) => n.type));
       } catch (e) {
         console.error("Failed to load workflow from storage:", e);
       }

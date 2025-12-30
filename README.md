@@ -2,3 +2,8 @@
 
 - Execution Trace
 - Execution Context
+
+> Undo redo
+
+- Dual Stack Model
+- Expression Preview

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed } from "vue";
 import {
   DrawerContent,
   DrawerOverlay,
@@ -15,8 +15,10 @@ import {
   type NodeCategory,
 } from "@/types/workflow";
 import { useWorkflowStore } from "@/stores/workflow";
+import { useDragAndDrop } from "@/composables/useDragAndDrop";
 
 const workflowStore = useWorkflowStore();
+const { onDragStart } = useDragAndDrop();
 
 // Sync drawer open state with store
 const isOpen = computed({
@@ -74,18 +76,9 @@ function selectNode(type: NodeType) {
   }
 }
 
-// Handle drag start
-function onDragStart(event: DragEvent, type: NodeType) {
-  if (isNodeDisabled(type)) {
-    event.preventDefault();
-    return;
-  }
-
-  if (event.dataTransfer) {
-    event.dataTransfer.setData("application/vueflow", type);
-    event.dataTransfer.effectAllowed = "move";
-  }
-  workflowStore.startDrag(type);
+// Handle drag start from drawer - use composable and close drawer
+function handleDragStart(event: DragEvent, type: NodeType) {
+  onDragStart(event, type);
   workflowStore.closePalette();
 }
 </script>
@@ -162,7 +155,7 @@ function onDragStart(event: DragEvent, type: NodeType) {
                 }"
                 :title="getDisabledReason(node.type) || node.description"
                 @click="selectNode(node.type)"
-                @dragstart="onDragStart($event, node.type)"
+                @dragstart="handleDragStart($event, node.type)"
               >
                 <!-- Icon -->
                 <span

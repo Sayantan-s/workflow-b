@@ -1,16 +1,41 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Panel } from "@vue-flow/core";
-import { Play, Square, RotateCcw, Loader2, Undo2, Redo2 } from "lucide-vue-next";
+import {
+  Play,
+  Square,
+  RotateCcw,
+  Loader2,
+  Undo2,
+  Redo2,
+  Plus,
+} from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import { useWorkflowStore } from "@/stores/workflow";
 import { useWorkflowExecution } from "@/stores/execution";
+import { WorkflowNodeType } from "@/types/workflow";
 
 const workflowStore = useWorkflowStore();
 const executionStore = useWorkflowExecution();
 
+// Debug: Add a test node directly
+function addTestNode() {
+  const position = {
+    x: 200 + Math.random() * 200,
+    y: 200 + Math.random() * 200,
+  };
+  console.log("[Topbar] Adding test node at:", position);
+  const node = workflowStore.addNode(WorkflowNodeType.ACTION_HTTP, position);
+  console.log("[Topbar] Node added:", node);
+  console.log("[Topbar] Total nodes:", workflowStore.nodes.length);
+  toast.success("Test node added", { description: `Node ID: ${node?.id}` });
+}
+
 const canRun = computed(
-  () => workflowStore.hasTrigger && workflowStore.nodes.length > 0 && !executionStore.isExecuting
+  () =>
+    workflowStore.hasTrigger &&
+    workflowStore.nodes.length > 0 &&
+    !executionStore.isExecuting
 );
 
 const isExecuting = computed(() => executionStore.isExecuting);
@@ -36,13 +61,13 @@ function handleRedo() {
 
 async function runWorkflow() {
   if (!canRun.value) return;
-  
+
   try {
     toast.info("Starting workflow execution...", {
       description: "Running preview mode",
     });
     await executionStore.executeWorkflow();
-    
+
     const errors = executionStore.executionErrors;
     if (errors.length > 0) {
       toast.error("Workflow completed with errors", {
@@ -72,7 +97,7 @@ function resetWorkflow() {
 </script>
 
 <template>
-  <Panel position="top-center" class="mt-4!">
+  <Panel position="top-center" class="mt-4! z-20!">
     <div
       class="flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200"
     >
@@ -92,6 +117,16 @@ function resetWorkflow() {
         <span>{{ workflowStore.nodes.length }}</span>
         <span>nodes</span>
       </div>
+
+      <!-- Debug: Test add node button -->
+      <button
+        class="flex items-center gap-1 px-2 py-1 text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200"
+        @click="addTestNode"
+        title="Debug: Add test HTTP node"
+      >
+        <Plus class="w-3 h-3" />
+        Test Add
+      </button>
 
       <!-- Execution progress (when running) -->
       <div

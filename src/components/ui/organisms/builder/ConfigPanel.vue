@@ -102,7 +102,7 @@ function deleteNode() {
 </script>
 
 <template>
-  <Panel position="top-right" class="m-0!">
+  <Panel position="top-right" class="m-0! z-20!">
     <Transition
       enter-active-class="transition-transform duration-200 ease-out"
       enter-from-class="translate-x-full"

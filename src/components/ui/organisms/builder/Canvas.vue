@@ -7,6 +7,7 @@ import { MiniMap } from "@vue-flow/minimap";
 import { toast } from "vue-sonner";
 import { useWorkflowStore } from "@/stores/workflow";
 import { useNodeNavigation } from "@/composables/useNodeNavigation";
+import { useDragAndDrop } from "@/composables/useDragAndDrop";
 import type { NodeType } from "@/types/workflow";
 
 // Import custom node and edge components
@@ -24,11 +25,119 @@ import WorkFlowEdge from "./WorkFlowEdge.vue";
 
 const workflowStore = useWorkflowStore();
 
+// Debug: Watch nodes array for changes
+watch(
+  () => workflowStore.nodes,
+  (newNodes, oldNodes) => {
+    console.log(
+      "[Canvas] Nodes changed:",
+      oldNodes?.length,
+      "->",
+      newNodes?.length
+    );
+    if (newNodes?.length > (oldNodes?.length || 0)) {
+      const newNode = newNodes[newNodes.length - 1];
+      console.log("[Canvas] New node added:", newNode?.id, newNode?.type);
+    }
+  },
+  { deep: true }
+);
+
 // Initialize keyboard navigation for connected nodes
 useNodeNavigation();
 
-const { onConnect, onNodesChange, onEdgesChange, project, vueFlowRef } =
-  useVueFlow();
+// Initialize drag and drop state
+const { isDragOver, draggedType, onDragOver, onDragLeave, onDragEnd } =
+  useDragAndDrop();
+
+// Get VueFlow APIs (this is inside VueFlow context)
+const {
+  onConnect,
+  onNodesChange,
+  onEdgesChange,
+  screenToFlowCoordinate,
+  onNodesInitialized,
+  updateNode,
+  getNodes,
+} = useVueFlow();
+
+/**
+ * Handle drop event - creates a new node at the drop position
+ * This must be implemented here (inside VueFlow) because it needs VueFlow APIs
+ */
+function onDrop(event: DragEvent) {
+  event.preventDefault();
+  event.stopPropagation(); // Prevent bubbling to document listener
+
+  console.log("[Canvas] ========== DROP EVENT ==========");
+  console.log("[Canvas] draggedType.value:", draggedType.value);
+  console.log(
+    "[Canvas] workflowStore.draggedNodeType:",
+    workflowStore.draggedNodeType
+  );
+  console.log(
+    "[Canvas] dataTransfer:",
+    event.dataTransfer?.getData("application/vueflow")
+  );
+
+  // Try multiple sources for the node type (in order of preference)
+  const type =
+    draggedType.value ||
+    workflowStore.draggedNodeType ||
+    (event.dataTransfer?.getData("application/vueflow") as NodeType);
+
+  console.log("[Canvas] Resolved type:", type);
+
+  if (!type) {
+    console.error("[Canvas] ❌ No node type found from any source!");
+    onDragEnd();
+    return;
+  }
+
+  // Validate that we can add this node type
+  const validation = workflowStore.canAddNode(type);
+  if (!validation.allowed) {
+    console.warn(`Cannot add node: ${validation.reason}`);
+    onDragEnd();
+    return;
+  }
+
+  // Convert screen coordinates to flow coordinates
+  const position = screenToFlowCoordinate({
+    x: event.clientX,
+    y: event.clientY,
+  });
+
+  // Add the node through the workflow store
+  console.log("[Canvas] Adding node at position:", position);
+  const newNode = workflowStore.addNode(type, position);
+  console.log("[Canvas] New node created:", newNode);
+  console.log("[Canvas] Total nodes in store:", workflowStore.nodes.length);
+
+  if (newNode) {
+    // Center the node on the drop position after it's been initialized
+    const { off } = onNodesInitialized(() => {
+      const nodes = getNodes.value;
+      const node = nodes.find((n) => n.id === newNode.id);
+
+      if (node && node.dimensions) {
+        // Update position to center the node on the drop point
+        const centeredPosition = {
+          x: position.x - node.dimensions.width / 2,
+          y: position.y - node.dimensions.height / 2,
+        };
+
+        updateNode(newNode.id, { position: centeredPosition });
+        workflowStore.updateNodePosition(newNode.id, centeredPosition);
+      }
+
+      off();
+    });
+  }
+
+  // Reset drag state
+  onDragEnd();
+}
 
 // Check if a handle ID is a source handle
 function isSourceHandle(handleId: string | null | undefined): boolean {
@@ -158,30 +267,6 @@ onEdgesChange((changes) => {
   });
 });
 
-// Handle drop from palette
-function onDragOver(event: DragEvent) {
-  event.preventDefault();
-  if (event.dataTransfer) {
-    event.dataTransfer.dropEffect = "move";
-  }
-}
-
-function onDrop(event: DragEvent) {
-  const type = event.dataTransfer?.getData("application/vueflow") as NodeType;
-
-  if (!type || !vueFlowRef.value) return;
-
-  // Get the drop position relative to the canvas
-  const { left, top } = vueFlowRef.value.getBoundingClientRect();
-  const position = project({
-    x: event.clientX - left,
-    y: event.clientY - top,
-  });
-
-  workflowStore.addNode(type, position);
-  workflowStore.endDrag();
-}
-
 // Handle canvas click to deselect
 function onPaneClick() {
   workflowStore.setActiveNode(null);
@@ -203,10 +288,9 @@ function onPaneClick() {
     :delete-key-code="['Backspace', 'Delete']"
     :multi-selection-key-code="['Meta', 'Control']"
     :selection-key-code="['Shift']"
+    :disable-keyboard-a11y="true"
     fit-view-on-init
-    class="bg-gray-100"
-    @dragover="onDragOver"
-    @drop="onDrop"
+    class="bg-gray-100 relative"
     @pane-click="onPaneClick"
     :style="{
       width: '100vw',
@@ -215,6 +299,28 @@ function onPaneClick() {
   >
     <!-- Background pattern -->
     <Background :gap="20" :size="1" pattern-color="#99a1af" variant="dots" />
+
+    <!-- Drop Zone Overlay - Visible only when dragging -->
+    <!-- z-10 ensures it's above the grid/nodes but below the UI panels (which are z-20+) -->
+    <div
+      v-if="isDragOver || draggedType"
+      class="absolute inset-0 z-10 flex items-center justify-center transition-all duration-200"
+      :class="isDragOver ? 'bg-indigo-50/30 backdrop-blur-[1px]' : ''"
+      @dragover="onDragOver"
+      @dragleave="onDragLeave"
+      @drop="onDrop"
+    >
+      <div
+        v-if="isDragOver"
+        class="absolute inset-4 border-2 border-dashed border-indigo-400 rounded-xl pointer-events-none"
+      />
+      <div
+        v-if="isDragOver"
+        class="px-6 py-3 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border border-indigo-200 pointer-events-none"
+      >
+        <p class="text-sm font-medium text-indigo-600">Drop to add node here</p>
+      </div>
+    </div>
 
     <!-- Mini map -->
     <MiniMap
