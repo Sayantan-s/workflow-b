@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { Panel } from "@vue-flow/core";
 import {
   Play,
@@ -14,9 +14,39 @@ import { toast } from "vue-sonner";
 import { useWorkflowStore } from "@/stores/workflow";
 import { useWorkflowExecution } from "@/stores/execution";
 import { WorkflowNodeType } from "@/types/workflow";
+import { getWorkflowTemplates } from "@/lib/workflowTemplates";
 
 const workflowStore = useWorkflowStore();
 const executionStore = useWorkflowExecution();
+
+// Workflow templates
+const templates = getWorkflowTemplates();
+const selectedTemplate = ref<string>("");
+
+// Template options for dropdown
+const templateOptions = computed(() =>
+  templates.map((template) => ({
+    value: template.id,
+    label: template.name,
+  }))
+);
+
+// Handle template selection
+function handleTemplateSelect(templateId: string) {
+  if (!templateId) return;
+
+  const template = templates.find((t) => t.id === templateId);
+  if (!template) return;
+
+  // Clear current workflow and load template
+  workflowStore.loadWorkflowTemplate(template);
+  toast.success("Workflow template loaded", {
+    description: template.description,
+  });
+
+  // Reset selection
+  selectedTemplate.value = "";
+}
 
 // Debug: Add a test node directly
 function addTestNode() {
@@ -118,15 +148,18 @@ function resetWorkflow() {
         <span>nodes</span>
       </div>
 
+      <!-- Load Template Dropdown -->
+      <div class="flex items-center gap-2 pr-4 border-r border-gray-200">
+        <Select
+          v-model="selectedTemplate"
+          :options="templateOptions"
+          placeholder="Load template..."
+          size="sm"
+          @update:model-value="handleTemplateSelect"
+        />
+      </div>
+
       <!-- Debug: Test add node button -->
-      <button
-        class="flex items-center gap-1 px-2 py-1 text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200"
-        @click="addTestNode"
-        title="Debug: Add test HTTP node"
-      >
-        <Plus class="w-3 h-3" />
-        Test Add
-      </button>
 
       <!-- Execution progress (when running) -->
       <div

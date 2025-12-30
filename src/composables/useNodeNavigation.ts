@@ -4,7 +4,7 @@ import { useWorkflowStore } from "@/stores/workflow";
 
 /**
  * Composable for keyboard navigation between connected nodes
- * 
+ *
  * Arrow keys navigate through connected nodes:
  * - Right/Down: Navigate to downstream nodes (outgoing connections)
  * - Left/Up: Navigate to upstream nodes (incoming connections)
@@ -55,7 +55,7 @@ export function useNodeNavigation() {
   function focusNode(nodeId: string) {
     // Set as active node (shows config panel)
     workflowStore.setActiveNode(nodeId);
-    
+
     // Select the node visually
     workflowStore.selectNodes([nodeId]);
 
@@ -111,7 +111,7 @@ export function useNodeNavigation() {
     // Get all siblings (other children of the same parent)
     const parentId = upstream[0];
     const siblings = getDownstreamNodes(parentId);
-    
+
     if (siblings.length <= 1) return;
 
     // Find current index and navigate to next
@@ -134,7 +134,7 @@ export function useNodeNavigation() {
     // Get all siblings (other children of the same parent)
     const parentId = upstream[0];
     const siblings = getDownstreamNodes(parentId);
-    
+
     if (siblings.length <= 1) return;
 
     // Find current index and navigate to previous
@@ -209,4 +209,3 @@ export function useNodeNavigation() {
     navigatePrevSibling,
   };
 }
-

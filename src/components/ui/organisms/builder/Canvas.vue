@@ -275,13 +275,15 @@ function onPaneClick() {
 }
 
 /**
- * Handle keyboard shortcut for selecting all nodes (Cmd+A / Ctrl+A)
+ * Handle keyboard shortcuts
  */
-function handleSelectAll(e: KeyboardEvent) {
-  // Check if Cmd+A (Mac) or Ctrl+A (Windows/Linux)
-  const isSelectAll = (e.metaKey || e.ctrlKey) && e.key === "a";
+function handleKeyboardShortcuts(e: KeyboardEvent) {
+  const isMod = e.metaKey || e.ctrlKey;
 
-  if (!isSelectAll) return;
+  // Only handle copy/paste if modifier key is pressed
+  if (!isMod || (e.key !== "c" && e.key !== "v" && e.key !== "a")) {
+    return;
+  }
 
   // Skip if user is typing in an input field, textarea, or contenteditable element
   const target = e.target as HTMLElement;
@@ -293,26 +295,59 @@ function handleSelectAll(e: KeyboardEvent) {
     return;
   }
 
-  // Prevent default browser select all behavior
-  e.preventDefault();
+  // Select All: Cmd/Ctrl + A
+  if (isMod && e.key === "a") {
+    e.preventDefault();
+    workflowStore.selectAll();
+    const allNodes = getNodes.value;
+    if (allNodes.length > 0) {
+      addSelectedNodes(allNodes);
+    }
+    return;
+  }
 
-  // Select all nodes in the store
-  workflowStore.selectAll();
+  // Copy: Cmd/Ctrl + C
+  if (isMod && e.key === "c") {
+    e.preventDefault();
+    // Copy is handled by storing selected nodes in a ref
+    // The actual duplication happens on paste
+    return;
+  }
 
-  // Also update VueFlow's selection state by getting actual node objects
-  const allNodes = getNodes.value;
-  if (allNodes.length > 0) {
-    addSelectedNodes(allNodes);
+  // Paste: Cmd/Ctrl + V
+  if (isMod && e.key === "v") {
+    e.preventDefault();
+    console.log(
+      "[Canvas] Paste detected, selected nodes:",
+      workflowStore.selectedNodeIds.size,
+      "active node:",
+      workflowStore.activeNodeId
+    );
+    // Duplicate selected nodes (or active node if none selected)
+    workflowStore.duplicateNodes();
+
+    // Update VueFlow's selection state after duplication
+    // Wait a tick for nodes to be added to VueFlow
+    setTimeout(() => {
+      const duplicatedNodes = getNodes.value.filter((n) =>
+        workflowStore.selectedNodeIds.has(n.id)
+      );
+      if (duplicatedNodes.length > 0) {
+        addSelectedNodes(duplicatedNodes);
+      }
+    }, 0);
+    return;
   }
 }
 
-// Setup keyboard event listener for select all
+// Setup keyboard event listener with capture to ensure we catch it early
 onMounted(() => {
-  window.addEventListener("keydown", handleSelectAll);
+  window.addEventListener("keydown", handleKeyboardShortcuts, true);
+  console.log("[Canvas] Keyboard shortcuts handler registered");
 });
 
 onUnmounted(() => {
-  window.removeEventListener("keydown", handleSelectAll);
+  window.removeEventListener("keydown", handleKeyboardShortcuts, true);
 });
 </script>
 

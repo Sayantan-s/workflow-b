@@ -223,7 +223,9 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
         }
         // Debug: log unresolved variable
         console.warn(
-          `[Execution] Variable not found: {{ ${variableName} }}. Available: ${Object.keys(executionContext.value.variables).join(", ") || "none"}`
+          `[Execution] Variable not found: {{ ${variableName} }}. Available: ${
+            Object.keys(executionContext.value.variables).join(", ") || "none"
+          }`
         );
         return match; // Return original if variable not found
       }
@@ -360,18 +362,19 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
 
           // Resolve variables in URL
           const url = resolveVariables(data.url);
-          
+
           // Debug logging
           if (data.url !== url) {
-            addLog(
-              node.id,
-              `Resolved URL: "${data.url}" → "${url}"`,
-              "info"
-            );
+            addLog(node.id, `Resolved URL: "${data.url}" → "${url}"`, "info");
           } else if (data.url.includes("{{")) {
             addLog(
               node.id,
-              `Warning: URL contains unresolved variables: "${data.url}". Available variables: ${Object.keys(executionContext.value.variables).join(", ") || "none"}`,
+              `Warning: URL contains unresolved variables: "${
+                data.url
+              }". Available variables: ${
+                Object.keys(executionContext.value.variables).join(", ") ||
+                "none"
+              }`,
               "warning"
             );
           }
@@ -414,7 +417,11 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
               ...httpResult,
               branch: "success" as const,
             };
-            addLog(node.id, `HTTP ${data.method} request succeeded (${httpResult.status})`, "success");
+            addLog(
+              node.id,
+              `HTTP ${data.method} request succeeded (${httpResult.status})`,
+              "success"
+            );
           } catch (error) {
             // Error case - return error info with branch indicator
             const errorMessage =
@@ -428,7 +435,11 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
               data: null,
               duration: Date.now() - startTime,
             };
-            addLog(node.id, `HTTP ${data.method} request failed: ${errorMessage}`, "error");
+            addLog(
+              node.id,
+              `HTTP ${data.method} request failed: ${errorMessage}`,
+              "error"
+            );
           }
           break;
         }
@@ -491,7 +502,7 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
 
           // Store variables in context
           Object.assign(executionContext.value.variables, result.variables);
-          
+
           // Debug: log stored variables
           console.log(
             `[Execution] Transform node stored variables:`,
@@ -503,13 +514,17 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
             `[Execution] All variables in context:`,
             Object.keys(executionContext.value.variables)
           );
-          
+
           addLog(
             node.id,
-            `Stored ${Object.keys(result.variables).length} variable(s): ${Object.keys(result.variables).join(", ")}`,
+            `Stored ${
+              Object.keys(result.variables).length
+            } variable(s): ${Object.keys(result.variables)
+              .map((key) => `${key} = ${JSON.stringify(result.variables[key])}`)
+              .join(", ")}`,
             "success"
           );
-          
+
           output = result;
           break;
         }
@@ -718,7 +733,9 @@ export const useWorkflowExecution = defineStore("workflowExecution", () => {
             nodeExecutionStatus.value[skippedId] = "skipped";
             addLog(
               skippedId,
-              `Skipped (${otherBranch === "error" ? "request succeeded" : "request failed"})`,
+              `Skipped (${
+                otherBranch === "error" ? "request succeeded" : "request failed"
+              })`,
               "warning"
             );
           });

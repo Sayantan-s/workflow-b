@@ -7,6 +7,7 @@ import {
   type WorkflowEdge,
   type WorkflowNodeData,
   WorkflowNodeType,
+  WorkflowExecutionStatus,
 } from "@/types/workflow";
 import {
   createDefaultNodeData,
@@ -22,6 +23,7 @@ import {
 import { getEdgeStyle } from "@/lib/graphValidation";
 import { validateNodeData, getNodeSchema } from "@/lib/schemas";
 import { useWorkflowHistory } from "@/composables/useWorkflowHistory";
+import type { WorkflowTemplate } from "@/lib/workflowTemplates";
 
 const STORAGE_KEY = "workflow-state";
 
@@ -180,7 +182,12 @@ export const useWorkflowStore = defineStore("workflow", () => {
     const nodeData = createDefaultNodeData(type);
 
     const vueFlowType = getVueFlowNodeType(type);
-    console.log("[WorkflowStore] Creating node with type:", type, "->", vueFlowType);
+    console.log(
+      "[WorkflowStore] Creating node with type:",
+      type,
+      "->",
+      vueFlowType
+    );
 
     const newNode: WorkflowNode = {
       id,
@@ -221,6 +228,125 @@ export const useWorkflowStore = defineStore("workflow", () => {
 
     // Clear from selection
     nodeIds.forEach((id) => selectedNodeIds.value.delete(id));
+  }
+
+  /**
+   * Duplicate selected nodes
+   * Creates copies of selected nodes with new IDs and offset positions
+   * If no nodes are selected, uses the active node
+   */
+  function duplicateNodes() {
+    let selected = selectedNodes.value;
+
+    // If no nodes are selected, try using the active node
+    if (selected.length === 0 && activeNodeId.value) {
+      const activeNode = nodes.value.find((n) => n.id === activeNodeId.value);
+      if (activeNode) {
+        selected = [activeNode];
+        // Also select it
+        selectNodes([activeNode.id]);
+      }
+    }
+
+    console.log(
+      "[WorkflowStore] duplicateNodes called, selected nodes:",
+      selected.length
+    );
+
+    if (selected.length === 0) {
+      console.warn("[WorkflowStore] No nodes selected for duplication");
+      return;
+    }
+
+    // Record snapshot before change
+    recordSnapshot();
+
+    const offset = { x: 50, y: 50 }; // Offset for duplicated nodes
+    const nodeIdMap = new Map<string, string>(); // Map old ID -> new ID
+
+    // Create duplicated nodes
+    const duplicatedNodes: WorkflowNode[] = selected.map((node) => {
+      const newId = generateNodeId();
+      nodeIdMap.set(node.id, newId);
+
+      // Deep clone the data to avoid reference issues
+      const duplicatedData: WorkflowNodeData = {
+        ...(node.data as WorkflowNodeData),
+        executionStatus: WorkflowExecutionStatus.IDLE,
+      };
+
+      const duplicatedNode: WorkflowNode = {
+        ...node,
+        id: newId,
+        type: node.type, // Preserve VueFlow node type
+        position: {
+          x: node.position.x + offset.x,
+          y: node.position.y + offset.y,
+        },
+        data: duplicatedData,
+      };
+
+      console.log(
+        "[WorkflowStore] Duplicating node:",
+        node.id,
+        "->",
+        newId,
+        "Type:",
+        node.type
+      );
+      return duplicatedNode;
+    });
+
+    console.log(
+      "[WorkflowStore] Created",
+      duplicatedNodes.length,
+      "duplicated nodes"
+    );
+
+    // Add duplicated nodes - use array spread to ensure reactivity
+    nodes.value = [...nodes.value, ...duplicatedNodes];
+    console.log(
+      "[WorkflowStore] Total nodes after duplication:",
+      nodes.value.length
+    );
+
+    // Create duplicated edges (only between duplicated nodes)
+    const duplicatedEdges: WorkflowEdge[] = [];
+    edges.value.forEach((edge) => {
+      const newSourceId = nodeIdMap.get(edge.source);
+      const newTargetId = nodeIdMap.get(edge.target);
+
+      // Only duplicate edges where both source and target were duplicated
+      if (newSourceId && newTargetId) {
+        duplicatedEdges.push({
+          ...edge,
+          id: generateEdgeId(
+            newSourceId,
+            newTargetId,
+            edge.sourceHandle || undefined
+          ),
+          source: newSourceId,
+          target: newTargetId,
+        });
+      }
+    });
+
+    if (duplicatedEdges.length > 0) {
+      edges.value = [...edges.value, ...duplicatedEdges];
+      console.log(
+        "[WorkflowStore] Created",
+        duplicatedEdges.length,
+        "duplicated edges"
+      );
+    }
+
+    // Select the duplicated nodes
+    selectNodes(duplicatedNodes.map((n) => n.id));
+    if (duplicatedNodes.length === 1 && duplicatedNodes[0]?.id) {
+      setActiveNode(duplicatedNodes[0].id);
+    }
+
+    console.log("[WorkflowStore] Duplication complete");
   }
 
   /**
@@ -432,9 +558,14 @@ export const useWorkflowStore = defineStore("workflow", () => {
 
   /**
    * Set the active node (for config panel)
+   * Also selects the node if it's not null
    */
   function setActiveNode(nodeId: string | null) {
     activeNodeId.value = nodeId;
+    // Also select the node when it becomes active
+    if (nodeId) {
+      selectNodes([nodeId]);
+    }
   }
 
   /**
@@ -565,14 +696,20 @@ export const useWorkflowStore = defineStore("workflow", () => {
    */
   function loadFromStorage() {
     const saved = localStorage.getItem(STORAGE_KEY);
-    console.log("[WorkflowStore] Loading from storage:", saved ? "found" : "empty");
+    console.log(
+      "[WorkflowStore] Loading from storage:",
+      saved ? "found" : "empty"
+    );
     if (saved) {
       try {
         const state = JSON.parse(saved);
         nodes.value = state.nodes || [];
         edges.value = state.edges || [];
         console.log("[WorkflowStore] Loaded nodes:", nodes.value.length);
-        console.log("[WorkflowStore] Node types:", nodes.value.map((n: WorkflowNode) => n.type));
+        console.log(
+          "[WorkflowStore] Node types:",
+          nodes.value.map((n: WorkflowNode) => n.type)
+        );
       } catch (e) {
         console.error("Failed to load workflow from storage:", e);
       }
@@ -594,6 +731,40 @@ export const useWorkflowStore = defineStore("workflow", () => {
 
     // Clear history after clearing workflow
     history.clearHistory();
+  }
+
+  /**
+   * Load a workflow template
+   */
+  function loadWorkflowTemplate(template: WorkflowTemplate) {
+    // Record snapshot before loading
+    recordSnapshot();
+
+    // Clear current workflow
+    nodes.value = [];
+    edges.value = [];
+    activeNodeId.value = null;
+    selectedNodeIds.value.clear();
+
+    // Deep clone nodes to avoid reference issues
+    nodes.value = template.nodes.map((node) => ({
+      ...node,
+      data: { ...node.data } as WorkflowNodeData,
+    })) as WorkflowNode[];
+
+    // Add edges one by one using addEdge to ensure proper Vue Flow integration
+    // This ensures edges are properly connected and validated
+    template.edges.forEach((edge) => {
+      addEdge(
+        edge.source,
+        edge.target,
+        edge.sourceHandle ?? undefined,
+        edge.targetHandle ?? undefined
+      );
+    });
+
+    // Save to storage
+    saveToStorage();
   }
 
   // Auto-save and validate when nodes or edges change
@@ -658,6 +829,7 @@ export const useWorkflowStore = defineStore("workflow", () => {
     // Node Actions
     addNode,
     removeNodes,
+    duplicateNodes,
     updateNodeData,
     updateNodePosition,
 
@@ -686,5 +858,6 @@ export const useWorkflowStore = defineStore("workflow", () => {
     saveToStorage,
     loadFromStorage,
     clearWorkflow,
+    loadWorkflowTemplate,
   };
 });
