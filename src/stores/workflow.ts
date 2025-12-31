@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed, watch } from "vue";
-import type { Edge } from "@vue-flow/core";
+import { debounce } from "es-toolkit";
 import {
   type NodeType,
   type WorkflowNode,
@@ -26,11 +26,32 @@ import { useWorkflowHistory } from "@/composables/useWorkflowHistory";
 import type { WorkflowTemplate } from "@/lib/workflowTemplates";
 
 const STORAGE_KEY = "workflow-state";
+const PERSISTENCE_DEBOUNCE_MS = 500;
 
 export const useWorkflowStore = defineStore("workflow", () => {
-  // ============ STATE ============
-  const nodes = ref<WorkflowNode[]>([]);
-  const edges = ref<WorkflowEdge[]>([]);
+  // ============ NORMALIZED STATE (O(1) operations) ============
+  // Store nodes and edges in Maps for O(1) lookup, add, delete operations
+  const nodesMap = ref<Map<string, WorkflowNode>>(new Map());
+  const edgesMap = ref<Map<string, WorkflowEdge>>(new Map());
+
+  // Computed arrays for Vue Flow compatibility (reactive)
+  const nodes = computed({
+    get: () => Array.from(nodesMap.value.values()),
+    set: (newNodes: WorkflowNode[]) => {
+      const newMap = new Map<string, WorkflowNode>();
+      newNodes.forEach((node) => newMap.set(node.id, node));
+      nodesMap.value = newMap;
+    },
+  });
+
+  const edges = computed({
+    get: () => Array.from(edgesMap.value.values()),
+    set: (newEdges: WorkflowEdge[]) => {
+      const newMap = new Map<string, WorkflowEdge>();
+      newEdges.forEach((edge) => newMap.set(edge.id, edge));
+      edgesMap.value = newMap;
+    },
+  });
 
   // Selection state
   const selectedNodeIds = ref<Set<string>>(new Set());
@@ -64,16 +85,28 @@ export const useWorkflowStore = defineStore("workflow", () => {
   function undo() {
     const snapshot = history.undo(nodes.value, edges.value);
     if (snapshot) {
-      nodes.value = snapshot.nodes;
-      edges.value = snapshot.edges;
+      // Rebuild Maps from arrays
+      const newNodesMap = new Map<string, WorkflowNode>();
+      snapshot.nodes.forEach((node) => newNodesMap.set(node.id, node));
+      nodesMap.value = newNodesMap;
+
+      const newEdgesMap = new Map<string, WorkflowEdge>();
+      snapshot.edges.forEach((edge) => newEdgesMap.set(edge.id, edge));
+      edgesMap.value = newEdgesMap;
     }
   }
 
   function redo() {
     const snapshot = history.redo(nodes.value, edges.value);
     if (snapshot) {
-      nodes.value = snapshot.nodes;
-      edges.value = snapshot.edges;
+      // Rebuild Maps from arrays
+      const newNodesMap = new Map<string, WorkflowNode>();
+      snapshot.nodes.forEach((node) => newNodesMap.set(node.id, node));
+      nodesMap.value = newNodesMap;
+
+      const newEdgesMap = new Map<string, WorkflowEdge>();
+      snapshot.edges.forEach((edge) => newEdgesMap.set(edge.id, edge));
+      edgesMap.value = newEdgesMap;
     }
   }
 
@@ -86,37 +119,64 @@ export const useWorkflowStore = defineStore("workflow", () => {
   }
 
   // ============ GETTERS ============
-  const activeNode = computed(
-    () => nodes.value.find((n) => n.id === activeNodeId.value) ?? null
+  const activeNode = computed(() =>
+    activeNodeId.value ? nodesMap.value.get(activeNodeId.value) ?? null : null
   );
 
-  const selectedNodes = computed(() =>
-    nodes.value.filter((n) => selectedNodeIds.value.has(n.id))
-  );
+  const selectedNodes = computed(() => {
+    const result: WorkflowNode[] = [];
+    selectedNodeIds.value.forEach((id) => {
+      const node = nodesMap.value.get(id);
+      if (node) result.push(node);
+    });
+    return result;
+  });
 
-  const nodesByCategory = computed(() => ({
-    triggers: nodes.value.filter((n) => n?.data?.type?.startsWith("trigger:")),
-    actions: nodes.value.filter((n) => n?.data?.type?.startsWith("action:")),
-    logic: nodes.value.filter((n) => n?.data?.type?.startsWith("logic:")),
-  }));
+  const nodesByCategory = computed(() => {
+    const triggers: WorkflowNode[] = [];
+    const actions: WorkflowNode[] = [];
+    const logic: WorkflowNode[] = [];
 
-  const isWorkflowValid = computed(
-    () => nodes.value.length > 0 && nodes.value.every((n) => n?.data?.isValid)
-  );
+    nodesMap.value.forEach((node) => {
+      const type = node?.data?.type;
+      if (type?.startsWith("trigger:")) triggers.push(node);
+      else if (type?.startsWith("action:")) actions.push(node);
+      else if (type?.startsWith("logic:")) logic.push(node);
+    });
 
-  const hasTrigger = computed(() =>
-    nodes.value.some((n) => n?.data?.type?.startsWith("trigger:"))
-  );
+    return { triggers, actions, logic };
+  });
+
+  const isWorkflowValid = computed(() => {
+    if (nodesMap.value.size === 0) return false;
+    for (const node of nodesMap.value.values()) {
+      if (!node?.data?.isValid) return false;
+    }
+    return true;
+  });
+
+  const hasTrigger = computed(() => {
+    for (const node of nodesMap.value.values()) {
+      if (node?.data?.type?.startsWith("trigger:")) return true;
+    }
+    return false;
+  });
 
   // Check if manual trigger already exists (Constraint: only one allowed)
-  const hasManualTrigger = computed(() =>
-    nodes.value.some((n) => n?.data?.type === WorkflowNodeType.TRIGGER_MANUAL)
-  );
+  const hasManualTrigger = computed(() => {
+    for (const node of nodesMap.value.values()) {
+      if (node?.data?.type === WorkflowNodeType.TRIGGER_MANUAL) return true;
+    }
+    return false;
+  });
 
   // Check if webhook trigger exists
-  const hasWebhookTrigger = computed(() =>
-    nodes.value.some((n) => n?.data?.type === WorkflowNodeType.TRIGGER_WEBHOOK)
-  );
+  const hasWebhookTrigger = computed(() => {
+    for (const node of nodesMap.value.values()) {
+      if (node?.data?.type === WorkflowNodeType.TRIGGER_WEBHOOK) return true;
+    }
+    return false;
+  });
 
   // Validation getters
   const graphErrors = computed(() => validationResult.value.errors);
@@ -198,15 +258,16 @@ export const useWorkflowStore = defineStore("workflow", () => {
 
     console.log("[WorkflowStore] New node:", JSON.stringify(newNode, null, 2));
 
-    nodes.value = [...nodes.value, newNode];
-    console.log("[WorkflowStore] Total nodes after add:", nodes.value.length);
+    // O(1) add operation
+    nodesMap.value.set(id, newNode);
+    console.log("[WorkflowStore] Total nodes after add:", nodesMap.value.size);
     setActiveNode(id);
 
     return newNode;
   }
 
   /**
-   * Remove nodes by their IDs
+   * Remove nodes by their IDs - O(1) per node
    */
   function removeNodes(nodeIds: string[]) {
     if (nodeIds.length === 0) return;
@@ -214,12 +275,17 @@ export const useWorkflowStore = defineStore("workflow", () => {
     // Record snapshot before change
     recordSnapshot();
 
-    nodes.value = nodes.value.filter((n) => !nodeIds.includes(n.id));
+    // O(1) delete operations
+    nodeIds.forEach((id) => nodesMap.value.delete(id));
 
-    // Also remove connected edges
-    edges.value = edges.value.filter(
-      (e: Edge) => !nodeIds.includes(e.source) && !nodeIds.includes(e.target)
-    ) as WorkflowEdge[];
+    // Remove connected edges - O(1) per edge lookup
+    const edgesToRemove: string[] = [];
+    edgesMap.value.forEach((edge, edgeId) => {
+      if (nodeIds.includes(edge.source) || nodeIds.includes(edge.target)) {
+        edgesToRemove.push(edgeId);
+      }
+    });
+    edgesToRemove.forEach((edgeId) => edgesMap.value.delete(edgeId));
 
     // Clear active node if it was removed
     if (activeNodeId.value && nodeIds.includes(activeNodeId.value)) {
@@ -240,7 +306,7 @@ export const useWorkflowStore = defineStore("workflow", () => {
 
     // If no nodes are selected, try using the active node
     if (selected.length === 0 && activeNodeId.value) {
-      const activeNode = nodes.value.find((n) => n.id === activeNodeId.value);
+      const activeNode = nodesMap.value.get(activeNodeId.value);
       if (activeNode) {
         selected = [activeNode];
         // Also select it
@@ -303,22 +369,22 @@ export const useWorkflowStore = defineStore("workflow", () => {
       "duplicated nodes"
     );
 
-    // Add duplicated nodes - use array spread to ensure reactivity
-    nodes.value = [...nodes.value, ...duplicatedNodes];
+    // Add duplicated nodes - O(1) per node
+    duplicatedNodes.forEach((node) => nodesMap.value.set(node.id, node));
     console.log(
       "[WorkflowStore] Total nodes after duplication:",
-      nodes.value.length
+      nodesMap.value.size
     );
 
-    // Create duplicated edges (only between duplicated nodes)
+    // Create duplicated edges (only between duplicated nodes) - O(1) per edge lookup
     const duplicatedEdges: WorkflowEdge[] = [];
-    edges.value.forEach((edge) => {
+    edgesMap.value.forEach((edge) => {
       const newSourceId = nodeIdMap.get(edge.source);
       const newTargetId = nodeIdMap.get(edge.target);
 
       // Only duplicate edges where both source and target were duplicated
       if (newSourceId && newTargetId) {
-        duplicatedEdges.push({
+        const newEdge: WorkflowEdge = {
           ...edge,
           id: generateEdgeId(
             newSourceId,
@@ -327,12 +393,14 @@ export const useWorkflowStore = defineStore("workflow", () => {
           ),
           source: newSourceId,
           target: newTargetId,
-        });
+        };
+        duplicatedEdges.push(newEdge);
+        // O(1) add operation
+        edgesMap.value.set(newEdge.id, newEdge);
       }
     });
 
     if (duplicatedEdges.length > 0) {
-      edges.value = [...edges.value, ...duplicatedEdges];
       console.log(
         "[WorkflowStore] Created",
         duplicatedEdges.length,
@@ -350,13 +418,13 @@ export const useWorkflowStore = defineStore("workflow", () => {
   }
 
   /**
-   * Validate node data using Zod schema
+   * Validate node data using Zod schema - O(1) lookup
    */
   function validateNode(nodeId: string): {
     valid: boolean;
     errors: string[];
   } {
-    const node = nodes.value.find((n) => n.id === nodeId);
+    const node = nodesMap.value.get(nodeId);
     if (!node) {
       return { valid: false, errors: ["Node not found"] };
     }
@@ -373,14 +441,14 @@ export const useWorkflowStore = defineStore("workflow", () => {
   }
 
   /**
-   * Update node data with optional Zod validation
+   * Update node data with optional Zod validation - O(1) lookup
    */
   function updateNodeData<T extends WorkflowNodeData>(
     nodeId: string,
     data: Partial<T>,
     options?: { validate?: boolean }
   ) {
-    const node = nodes.value.find((n) => n.id === nodeId);
+    const node = nodesMap.value.get(nodeId);
     if (node) {
       const newData = { ...node.data, ...data } as WorkflowNodeData;
 
@@ -406,13 +474,13 @@ export const useWorkflowStore = defineStore("workflow", () => {
   }
 
   /**
-   * Update node position
+   * Update node position - O(1) lookup
    */
   function updateNodePosition(
     nodeId: string,
     position: { x: number; y: number }
   ) {
-    const node = nodes.value.find((n) => n.id === nodeId);
+    const node = nodesMap.value.get(nodeId);
     if (node) {
       node.position = position;
     }
@@ -439,8 +507,8 @@ export const useWorkflowStore = defineStore("workflow", () => {
     sourceHandle?: string,
     targetHandle?: string
   ): { allowed: boolean; reason?: string; errors?: string[] } {
-    const sourceNode = nodes.value.find((n) => n.id === sourceId);
-    const targetNode = nodes.value.find((n) => n.id === targetId);
+    const sourceNode = nodesMap.value.get(sourceId);
+    const targetNode = nodesMap.value.get(targetId);
 
     if (!sourceNode || !targetNode) {
       return { allowed: false, reason: "Source or target node not found" };
@@ -506,10 +574,10 @@ export const useWorkflowStore = defineStore("workflow", () => {
 
     const id = generateEdgeId(source, target, sourceHandle);
 
-    // Check if edge already exists
-    const existingEdge = edges.value.find((e: Edge) => e.id === id);
+    // Check if edge already exists - O(1) lookup
+    const existingEdge = edgesMap.value.get(id);
     if (existingEdge) {
-      return existingEdge as WorkflowEdge;
+      return existingEdge;
     }
 
     // Record snapshot before change
@@ -532,7 +600,8 @@ export const useWorkflowStore = defineStore("workflow", () => {
       },
     };
 
-    edges.value = [...edges.value, newEdge];
+    // O(1) add operation
+    edgesMap.value.set(id, newEdge);
 
     // Re-run validation after adding edge
     runValidation();
@@ -541,7 +610,7 @@ export const useWorkflowStore = defineStore("workflow", () => {
   }
 
   /**
-   * Remove edges by their IDs
+   * Remove edges by their IDs - O(1) per edge
    */
   function removeEdges(edgeIds: string[]) {
     if (edgeIds.length === 0) return;
@@ -549,9 +618,8 @@ export const useWorkflowStore = defineStore("workflow", () => {
     // Record snapshot before change
     recordSnapshot();
 
-    edges.value = edges.value.filter(
-      (e: Edge) => !edgeIds.includes(e.id)
-    ) as WorkflowEdge[];
+    // O(1) delete operations
+    edgeIds.forEach((id) => edgesMap.value.delete(id));
   }
 
   // ============ SELECTION ACTIONS ============
@@ -582,7 +650,7 @@ export const useWorkflowStore = defineStore("workflow", () => {
    * Select all nodes
    */
   function selectAll() {
-    selectNodes(nodes.value.map((n) => n.id));
+    selectNodes(Array.from(nodesMap.value.keys()));
   }
 
   /**
@@ -658,17 +726,22 @@ export const useWorkflowStore = defineStore("workflow", () => {
    * Check if a node has outgoing edges from a specific handle
    */
   function hasOutgoingEdge(nodeId: string, handleId?: string): boolean {
-    return edges.value.some(
-      (e) =>
-        e.source === nodeId && (handleId ? e.sourceHandle === handleId : true)
-    );
+    for (const edge of edgesMap.value.values()) {
+      if (
+        edge.source === nodeId &&
+        (handleId ? edge.sourceHandle === handleId : true)
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
-   * Get the end position for an edge (for plus button placement)
+   * Get the end position for an edge (for plus button placement) - O(1) lookup
    */
   function getEdgeEndPosition(nodeId: string): { x: number; y: number } | null {
-    const node = nodes.value.find((n) => n.id === nodeId);
+    const node = nodesMap.value.get(nodeId);
     if (!node) return null;
 
     // Calculate position to the right of the source node
@@ -681,15 +754,23 @@ export const useWorkflowStore = defineStore("workflow", () => {
   // ============ PERSISTENCE ============
 
   /**
-   * Save workflow to localStorage
+   * Save workflow to localStorage (immediate, no debounce)
    */
-  function saveToStorage() {
+  function saveToStorageImmediate() {
     const state = {
-      nodes: nodes.value,
-      edges: edges.value,
+      nodes: Array.from(nodesMap.value.values()),
+      edges: Array.from(edgesMap.value.values()),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
+
+  /**
+   * Save workflow to localStorage with 500ms debounce using es-toolkit
+   */
+  const saveToStorage = debounce(
+    saveToStorageImmediate,
+    PERSISTENCE_DEBOUNCE_MS
+  );
 
   /**
    * Load workflow from localStorage
@@ -703,12 +784,26 @@ export const useWorkflowStore = defineStore("workflow", () => {
     if (saved) {
       try {
         const state = JSON.parse(saved);
-        nodes.value = state.nodes || [];
-        edges.value = state.edges || [];
-        console.log("[WorkflowStore] Loaded nodes:", nodes.value.length);
+        const loadedNodes = state.nodes || [];
+        const loadedEdges = state.edges || [];
+
+        // Rebuild Maps from arrays - O(n) but only on load
+        const newNodesMap = new Map<string, WorkflowNode>();
+        loadedNodes.forEach((node: WorkflowNode) => {
+          newNodesMap.set(node.id, node);
+        });
+        nodesMap.value = newNodesMap;
+
+        const newEdgesMap = new Map<string, WorkflowEdge>();
+        loadedEdges.forEach((edge: WorkflowEdge) => {
+          newEdgesMap.set(edge.id, edge);
+        });
+        edgesMap.value = newEdgesMap;
+
+        console.log("[WorkflowStore] Loaded nodes:", nodesMap.value.size);
         console.log(
           "[WorkflowStore] Node types:",
-          nodes.value.map((n: WorkflowNode) => n.type)
+          Array.from(nodesMap.value.values()).map((n: WorkflowNode) => n.type)
         );
       } catch (e) {
         console.error("Failed to load workflow from storage:", e);
@@ -723,11 +818,15 @@ export const useWorkflowStore = defineStore("workflow", () => {
     // Record snapshot before clearing
     recordSnapshot();
 
-    nodes.value = [];
-    edges.value = [];
+    // O(1) clear operations
+    nodesMap.value.clear();
+    edgesMap.value.clear();
     activeNodeId.value = null;
     selectedNodeIds.value.clear();
     localStorage.removeItem(STORAGE_KEY);
+
+    // Cancel any pending debounced save
+    saveToStorage.cancel();
 
     // Clear history after clearing workflow
     history.clearHistory();
@@ -741,16 +840,19 @@ export const useWorkflowStore = defineStore("workflow", () => {
     recordSnapshot();
 
     // Clear current workflow
-    nodes.value = [];
-    edges.value = [];
+    nodesMap.value.clear();
+    edgesMap.value.clear();
     activeNodeId.value = null;
     selectedNodeIds.value.clear();
 
-    // Deep clone nodes to avoid reference issues
-    nodes.value = template.nodes.map((node) => ({
-      ...node,
-      data: { ...node.data } as WorkflowNodeData,
-    })) as WorkflowNode[];
+    // Deep clone nodes and add to Map - O(n) but only on template load
+    template.nodes.forEach((node) => {
+      const clonedNode: WorkflowNode = {
+        ...node,
+        data: { ...node.data } as WorkflowNodeData,
+      };
+      nodesMap.value.set(node.id, clonedNode);
+    });
 
     // Add edges one by one using addEdge to ensure proper Vue Flow integration
     // This ensures edges are properly connected and validated
@@ -763,15 +865,16 @@ export const useWorkflowStore = defineStore("workflow", () => {
       );
     });
 
-    // Save to storage
+    // Save to storage (will be debounced)
     saveToStorage();
   }
 
   // Auto-save and validate when nodes or edges change
+  // Watch the Maps directly for better performance
   watch(
-    [nodes, edges],
+    [nodesMap, edgesMap],
     () => {
-      saveToStorage();
+      saveToStorage(); // Debounced
       runValidation();
     },
     { deep: true }
